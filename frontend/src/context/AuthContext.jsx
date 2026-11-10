@@ -1,35 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createDemoAdmin, readAdminSession, saveAdminSession } from "../services/authService";
 
 const AuthContext = createContext(null);
-const SESSION_KEY = "dtc-demo-admin";
-
-function readAdmin() {
-  try {
-    const stored = localStorage.getItem(SESSION_KEY);
-    return stored ? JSON.parse(stored) : null;
-  } catch (error) {
-    console.error("Could not read the local demo session:", error);
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-}
 
 export function AuthProvider({ children }) {
-  const [admin, setAdmin] = useState(readAdmin);
+  const [admin, setAdmin] = useState(readAdminSession);
 
   useEffect(() => {
-    if (admin) localStorage.setItem(SESSION_KEY, JSON.stringify(admin));
-    else localStorage.removeItem(SESSION_KEY);
+    saveAdminSession(admin);
   }, [admin]);
 
   function login(email) {
-    setAdmin({
-      id: "local-admin",
-      name: "Administrator",
-      email: email.trim().toLowerCase(),
-      role: "admin",
-      createdAt: new Date().toISOString()
-    });
+    setAdmin(createDemoAdmin(email));
   }
 
   function logout() {
