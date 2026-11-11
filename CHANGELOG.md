@@ -31,5 +31,11 @@ This document tracks all project contributions across the three core academic su
 - **Files Modified**:
   - `backend/src/routes/index.js`: Mounted `/api/crew` route hierarchy into main Express API router.
 
+### Commit 5: Automated Testing Suite for Crew APIs (Subject: ASD)
+- **Files Created**:
+  - `backend/tests/crew.test.js`: Added 12 automated unit and integration tests covering crew listing, role filtering (Driver vs. Conductor), availability statistics, CRUD operations, license requirement enforcement for drivers, duplicate badge rejection (409 Conflict), and duty-state safety checks (blocking deletion of on-duty crew members).
+  - Validated test suite: 30/30 tests passing across all backend modules.
+
+
 
 

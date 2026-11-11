@@ -90,12 +90,15 @@ Crew.init(
       }
     },
     phone: {
-      type: DataTypes.STRING(20),
+      type: DataTypes.STRING(30),
       allowNull: true,
       validate: {
-        is: {
-          args: /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$|^$/,
-          msg: "Please provide a valid Indian phone number."
+        isValidPhone(value) {
+          if (!value) return;
+          const cleaned = String(value).replace(/[\s\-\(\)]/g, "");
+          if (!/^(\+91|91|0)?[6-9]\d{9}$/.test(cleaned)) {
+            throw new Error("Please provide a valid Indian phone number.");
+          }
         }
       }
     }

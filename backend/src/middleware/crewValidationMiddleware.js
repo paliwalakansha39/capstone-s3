@@ -1,6 +1,11 @@
 const VALID_ROLES = ["Driver", "Conductor"];
 const VALID_STATUSES = ["Available", "On Duty", "On Rest", "On Leave"];
-const PHONE_REGEX = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
+
+function isValidIndianPhone(phone) {
+  if (!phone || typeof phone !== "string") return false;
+  const cleaned = phone.replace(/[\s\-\(\)]/g, "");
+  return /^(\+91|91|0)?[6-9]\d{9}$/.test(cleaned);
+}
 
 export function validateCreateCrew(req, res, next) {
   const {
@@ -54,7 +59,7 @@ export function validateCreateCrew(req, res, next) {
   }
 
   if (phone && typeof phone === "string" && phone.trim()) {
-    if (!PHONE_REGEX.test(phone.trim())) {
+    if (!isValidIndianPhone(phone)) {
       errors.push("Phone number must be a valid 10-digit Indian mobile number.");
     }
   }
@@ -121,7 +126,7 @@ export function validateUpdateCrew(req, res, next) {
   }
 
   if (phone !== undefined && phone !== null && phone.trim() !== "") {
-    if (!PHONE_REGEX.test(phone.trim())) {
+    if (!isValidIndianPhone(phone)) {
       errors.push("Phone number must be a valid 10-digit Indian mobile number.");
     }
   }
