@@ -20,3 +20,8 @@ This document tracks all project contributions across the three core academic su
   - `backend/src/scripts/migrate.js`: Added `crews` table to database synchronization routine.
   - `backend/src/scripts/seed.js`: Added 12 realistic DTC crew members (6 Drivers and 6 Conductors) with licenses, qualifications, depot allocations, and duty statuses across Delhi depots.
 
+### Commit 3: Crew Input Validation & Availability Rules (Subject: ASD)
+- **Files Created**:
+  - `backend/src/middleware/crewValidationMiddleware.js`: Implemented validation middleware for `createCrew` and `updateCrew` requests, enforcing role constraints (Driver vs. Conductor), license presence for drivers, badge uniqueness validation, phone format checking, and status verification (`Available`, `On Duty`, `On Rest`, `On Leave`).
+
+
