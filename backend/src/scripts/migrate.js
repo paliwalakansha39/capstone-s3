@@ -1,4 +1,4 @@
-import { sequelize, Bus, Route, Driver } from "../models/index.js";
+import { sequelize, Bus, Route, Driver, Crew } from "../models/index.js";
 import { initDatabaseConnection } from "../config/database.js";
 
 export async function runMigrations() {
@@ -10,7 +10,7 @@ export async function runMigrations() {
     await sequelize.sync({ alter: false });
 
     console.log("Database schema synced successfully.");
-    console.log("Tables verified: routes, drivers, buses.");
+    console.log("Tables verified: routes, drivers, buses, crews.");
     return true;
   } catch (error) {
     console.error("Migration failed:", error);
