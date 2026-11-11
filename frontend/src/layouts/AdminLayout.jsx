@@ -7,6 +7,7 @@ import {
   LogOut,
   Map,
   Menu,
+  UserCheck,
   Users,
   X
 } from "lucide-react";
@@ -19,6 +20,7 @@ const links = [
   { to: "/admin/profile", label: "Admin Profile", icon: CircleUserRound },
   { to: "/admin/users", label: "User Management", icon: Users },
   { to: "/admin/buses", label: "Bus Management", icon: BusFront },
+  { to: "/admin/crew", label: "Crew Management", icon: UserCheck },
   { to: "/admin/routes", label: "Route Management", icon: Map },
   { to: "/admin/duties", label: "Duty Scheduling", icon: Activity }
 ];

@@ -36,6 +36,17 @@ This document tracks all project contributions across the three core academic su
   - `backend/tests/crew.test.js`: Added 12 automated unit and integration tests covering crew listing, role filtering (Driver vs. Conductor), availability statistics, CRUD operations, license requirement enforcement for drivers, duplicate badge rejection (409 Conflict), and duty-state safety checks (blocking deletion of on-duty crew members).
   - Validated test suite: 30/30 tests passing across all backend modules.
 
+### Commit 6: Crew Management Interface, Availability Dashboard & API Service (Subject: ISD)
+- **Files Created**:
+  - `frontend/src/services/crewService.js`: API client integration with backend `/api/crew` endpoints (listing, availability stats, single retrieval, add, update, delete).
+  - `frontend/src/pages/CrewManagementPage.jsx`: Full-featured responsive crew management page with live KPI availability cards (Total crew, Available drivers/conductors, On-duty count), role/status/depot filters, search bar, crew roster table, quick status toggle, modal inspector, add/edit form with license validation, and delete safety checks.
+- **Files Modified**:
+  - `frontend/src/App.jsx`: Registered `/admin/crew` route in administrative router hierarchy.
+  - `frontend/src/layouts/AdminLayout.jsx`: Added Crew Management navigation link with `UserCheck` icon and responsive active state in admin sidebar.
+  - `frontend/src/pages/DashboardPage.jsx`: Connected live crew availability metrics and quick link to crew roster on the main admin dashboard.
+  - `README.md`: Documented Chunk 3 specifications and crew management API endpoints.
+
+
 
 
 

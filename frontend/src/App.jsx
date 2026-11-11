@@ -9,6 +9,7 @@ import PlaceholderPage from "./pages/PlaceholderPage";
 import ProfilePage from "./pages/ProfilePage";
 import UsersPage from "./pages/UsersPage";
 import BusManagementPage from "./pages/BusManagementPage";
+import CrewManagementPage from "./pages/CrewManagementPage";
 
 export default function App() {
   const { admin, login, logout } = useAuth();
@@ -22,6 +23,7 @@ export default function App() {
       <Route path="profile" element={<ProfilePage />} />
       <Route path="users" element={<UsersPage />} />
       <Route path="buses" element={<BusManagementPage />} />
+      <Route path="crew" element={<CrewManagementPage />} />
       <Route path="routes" element={<PlaceholderPage title="Route Management" />} />
       <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
     </Route>
