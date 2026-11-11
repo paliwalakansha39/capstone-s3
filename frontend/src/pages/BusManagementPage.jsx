@@ -9,6 +9,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  RefreshCw,
   RotateCcw,
   Search,
   Trash2,
@@ -16,8 +17,16 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
+import {
+  createBus,
+  deleteBus,
+  getBuses,
+  getDrivers,
+  getRoutes,
+  updateBus
+} from "../services/busService";
 
 const INITIAL_FORM = {
   busNumber: "",
@@ -32,22 +41,17 @@ const INITIAL_FORM = {
   driverId: ""
 };
 
-export default function BusManagementPage({
-  buses: initialBuses = [],
-  routes: initialRoutes = [],
-  drivers: initialDrivers = [],
-  onAddBus,
-  onUpdateBus,
-  onDeleteBus,
-  isLoading = false
-}) {
-  const [buses, setBuses] = useState(initialBuses);
-  const [routes, setRoutes] = useState(initialRoutes);
-  const [drivers, setDrivers] = useState(initialDrivers);
+export default function BusManagementPage() {
+  const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [drivers, setDrivers] = useState([]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [modalMode, setModalMode] = useState(null); // 'add' | 'edit' | 'view' | null
   const [activeBus, setActiveBus] = useState(null);
@@ -61,19 +65,57 @@ export default function BusManagementPage({
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
+  // Load auxiliary data (routes and drivers) on mount
   useEffect(() => {
-    setBuses(initialBuses);
-  }, [initialBuses]);
+    let mounted = true;
+    async function loadAuxData() {
+      try {
+        const [r, d] = await Promise.all([getRoutes(), getDrivers()]);
+        if (mounted) {
+          setRoutes(r || []);
+          setDrivers(d || []);
+        }
+      } catch (err) {
+        console.warn("Could not load routes/drivers helper data:", err.message);
+      }
+    }
+    loadAuxData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
+  // Fetch buses from backend
+  const loadBuses = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await getBuses({
+        search,
+        status: statusFilter,
+        busType: typeFilter,
+        limit: 100 // load current filtered set
+      });
+      if (response && response.data) {
+        setBuses(response.data);
+      }
+    } catch (err) {
+      console.error("Error loading buses from API:", err);
+      setError(err.message || "Failed to load bus records from backend API.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search, statusFilter, typeFilter]);
+
+  // Debounced load on search and filter change
   useEffect(() => {
-    setRoutes(initialRoutes);
-  }, [initialRoutes]);
+    const timer = setTimeout(() => {
+      loadBuses();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [loadBuses]);
 
-  useEffect(() => {
-    setDrivers(initialDrivers);
-  }, [initialDrivers]);
-
-  // Statistics calculation
+  // Aggregate statistics across fleet
   const stats = useMemo(() => {
     const total = buses.length;
     const active = buses.filter((b) => b.status === "Active").length;
@@ -82,32 +124,12 @@ export default function BusManagementPage({
     return { total, active, maintenance, electric };
   }, [buses]);
 
-  // Filtered and searched buses
-  const filteredBuses = useMemo(() => {
-    return buses.filter((bus) => {
-      const q = search.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        bus.busNumber.toLowerCase().includes(q) ||
-        bus.registrationNumber.toLowerCase().includes(q) ||
-        (bus.depot && bus.depot.toLowerCase().includes(q)) ||
-        (bus.manufacturer && bus.manufacturer.toLowerCase().includes(q)) ||
-        (bus.route?.routeNumber && bus.route.routeNumber.toLowerCase().includes(q)) ||
-        (bus.driver?.name && bus.driver.name.toLowerCase().includes(q));
-
-      const matchStatus = statusFilter === "all" || bus.status === statusFilter;
-      const matchType = typeFilter === "all" || bus.busType === typeFilter;
-
-      return matchSearch && matchStatus && matchType;
-    });
-  }, [buses, search, statusFilter, typeFilter]);
-
-  // Pagination slice
-  const totalPages = Math.ceil(filteredBuses.length / pageSize) || 1;
+  // Client-side pagination of fetched set
+  const totalPages = Math.ceil(buses.length / pageSize) || 1;
   const paginatedBuses = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredBuses.slice(start, start + pageSize);
-  }, [filteredBuses, currentPage, pageSize]);
+    return buses.slice(start, start + pageSize);
+  }, [buses, currentPage, pageSize]);
 
   function handleOpenAdd() {
     setForm(INITIAL_FORM);
@@ -152,9 +174,6 @@ export default function BusManagementPage({
     const errors = {};
     if (!form.busNumber.trim()) errors.busNumber = "Bus number is required.";
     if (!form.registrationNumber.trim()) errors.registrationNumber = "Registration number is required.";
-    else if (!/^[A-Z]{2}[ -]?[0-9]{1,2}[ -]?[A-Z]{1,3}[ -]?[0-9]{4}$/i.test(form.registrationNumber.trim())) {
-      errors.registrationNumber = "Enter a valid registration (e.g., DL 01 EA 2041).";
-    }
 
     const cap = Number(form.capacity);
     if (!cap || cap < 10 || cap > 120) {
@@ -164,16 +183,6 @@ export default function BusManagementPage({
     const year = Number(form.modelYear);
     if (year && (year < 1990 || year > new Date().getFullYear() + 1)) {
       errors.modelYear = "Enter a valid 4-digit model year.";
-    }
-
-    // Check duplicate locally if onAddBus / onUpdateBus not overriding
-    const duplicateReg = buses.find(
-      (b) =>
-        b.registrationNumber.toLowerCase() === form.registrationNumber.trim().toLowerCase() &&
-        b.id !== activeBus?.id
-    );
-    if (duplicateReg) {
-      errors.registrationNumber = `Registration already assigned to bus ${duplicateReg.busNumber}.`;
     }
 
     setFormErrors(errors);
@@ -187,57 +196,35 @@ export default function BusManagementPage({
 
     if (!validateForm()) return;
 
+    setIsSubmitting(true);
     try {
       const payload = {
-        ...form,
         busNumber: form.busNumber.trim(),
         registrationNumber: form.registrationNumber.trim().toUpperCase(),
+        busType: form.busType,
         capacity: Number(form.capacity),
+        depot: form.depot ? form.depot.trim() : null,
+        manufacturer: form.manufacturer ? form.manufacturer.trim() : null,
         modelYear: form.modelYear ? Number(form.modelYear) : null,
+        status: form.status,
         routeId: form.routeId || null,
         driverId: form.driverId || null
       };
 
       if (modalMode === "add") {
-        if (onAddBus) {
-          await onAddBus(payload);
-        } else {
-          // Local fallback
-          const newBus = {
-            ...payload,
-            id: crypto.randomUUID(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            route: routes.find((r) => r.id === payload.routeId),
-            driver: drivers.find((d) => d.id === payload.driverId)
-          };
-          setBuses((prev) => [newBus, ...prev]);
-        }
-        setNotice(`Bus ${payload.busNumber} added to fleet successfully.`);
+        await createBus(payload);
+        setNotice(`Bus ${payload.busNumber} registered in database successfully.`);
       } else if (modalMode === "edit") {
-        if (onUpdateBus) {
-          await onUpdateBus(activeBus.id, payload);
-        } else {
-          // Local fallback
-          setBuses((prev) =>
-            prev.map((b) =>
-              b.id === activeBus.id
-                ? {
-                    ...b,
-                    ...payload,
-                    updatedAt: new Date().toISOString(),
-                    route: routes.find((r) => r.id === payload.routeId),
-                    driver: drivers.find((d) => d.id === payload.driverId)
-                  }
-                : b
-            )
-          );
-        }
-        setNotice(`Bus ${payload.busNumber} updated successfully.`);
+        await updateBus(activeBus.id, payload);
+        setNotice(`Bus ${payload.busNumber} updated in database successfully.`);
       }
+
       closeModal();
+      await loadBuses();
     } catch (err) {
-      setError(err.message || "Failed to save bus details.");
+      setError(err.message || "Failed to save bus record to database.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -245,17 +232,17 @@ export default function BusManagementPage({
     if (!deleteTarget) return;
     setError("");
     setNotice("");
+    setIsSubmitting(true);
     try {
-      if (onDeleteBus) {
-        await onDeleteBus(deleteTarget.id);
-      } else {
-        setBuses((prev) => prev.filter((b) => b.id !== deleteTarget.id));
-      }
-      setNotice(`Bus ${deleteTarget.busNumber} deleted from fleet.`);
+      await deleteBus(deleteTarget.id);
+      setNotice(`Bus ${deleteTarget.busNumber} deleted from database.`);
       setDeleteTarget(null);
+      await loadBuses();
     } catch (err) {
-      setError(err.message || "Failed to delete bus.");
+      setError(err.message || "Failed to delete bus record.");
       setDeleteTarget(null);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -283,14 +270,19 @@ export default function BusManagementPage({
           <h1>Bus Management</h1>
           <p>Register, track, monitor, and maintain Delhi Transport Corporation fleet vehicles.</p>
         </div>
-        <button className="button button-primary" onClick={handleOpenAdd}>
-          <Plus size={16} /> Register new bus
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button className="button button-outline" onClick={loadBuses} title="Refresh fleet data">
+            <RefreshCw size={14} className={isLoading ? "spinner" : ""} /> Refresh
+          </button>
+          <button className="button button-primary" onClick={handleOpenAdd}>
+            <Plus size={16} /> Register new bus
+          </button>
+        </div>
       </div>
 
       {/* Fleet KPI Stat Cards */}
       <div className="bus-stats-bar">
-        <StatCard icon={BusFront} label="Total fleet" value={stats.total} note="Active DTC buses" />
+        <StatCard icon={BusFront} label="Total fleet" value={stats.total} note="Active in database" />
         <StatCard icon={CheckCircle2} label="In active service" value={stats.active} note="Dispatched on routes" accent />
         <StatCard icon={RotateCcw} label="Under maintenance" value={stats.maintenance} note="Depot service workshops" />
         <StatCard icon={Zap} label="Zero-emission electric" value={stats.electric} note="Clean mobility fleet" />
@@ -321,7 +313,7 @@ export default function BusManagementPage({
               <div>
                 <h2>Registered buses</h2>
                 <span>
-                  {filteredBuses.length} {filteredBuses.length === 1 ? "bus" : "buses"} in view
+                  {buses.length} {buses.length === 1 ? "bus" : "buses"} in view
                 </span>
               </div>
             </div>
@@ -393,8 +385,8 @@ export default function BusManagementPage({
           </div>
         </div>
 
-        {/* Loading Spinner or Table */}
-        {isLoading ? (
+        {/* Loading Box or Table */}
+        {isLoading && !buses.length ? (
           <div className="loading-box">
             <div className="spinner" />
             <span>Loading fleet data from database...</span>
@@ -512,11 +504,11 @@ export default function BusManagementPage({
         )}
 
         {/* Pagination Bar */}
-        {filteredBuses.length > pageSize && (
+        {buses.length > pageSize && (
           <div className="pagination-wrap">
             <span>
               Showing {(currentPage - 1) * pageSize + 1}–
-              {Math.min(currentPage * pageSize, filteredBuses.length)} of {filteredBuses.length} buses
+              {Math.min(currentPage * pageSize, buses.length)} of {buses.length} buses
             </span>
             <div className="pagination-actions">
               <button
@@ -547,7 +539,7 @@ export default function BusManagementPage({
           className="modal-backdrop"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeModal();
+            if (e.target === e.currentTarget && !isSubmitting) closeModal();
           }}
         >
           <section className="bus-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -556,7 +548,7 @@ export default function BusManagementPage({
                 <span className="eyebrow">FLEET ASSET FORM</span>
                 <h2 id="modal-title">{modalMode === "add" ? "Register new bus" : `Edit bus ${activeBus?.busNumber}`}</h2>
               </div>
-              <button onClick={closeModal} aria-label="Close dialog">
+              <button onClick={closeModal} aria-label="Close dialog" disabled={isSubmitting}>
                 <X size={19} />
               </button>
             </div>
@@ -571,6 +563,7 @@ export default function BusManagementPage({
                     onChange={(e) => setForm({ ...form, busNumber: e.target.value })}
                     placeholder="e.g. DTC-1045"
                     required
+                    disabled={isSubmitting}
                   />
                   {formErrors.busNumber && <span style={{ color: "#a33c2c", fontSize: "9px" }}>{formErrors.busNumber}</span>}
                 </label>
@@ -583,6 +576,7 @@ export default function BusManagementPage({
                     onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })}
                     placeholder="e.g. DL 01 EA 2045"
                     required
+                    disabled={isSubmitting}
                   />
                   {formErrors.registrationNumber && (
                     <span style={{ color: "#a33c2c", fontSize: "9px" }}>{formErrors.registrationNumber}</span>
@@ -595,6 +589,7 @@ export default function BusManagementPage({
                   <select
                     value={form.busType}
                     onChange={(e) => setForm({ ...form, busType: e.target.value })}
+                    disabled={isSubmitting}
                   >
                     <option value="Electric">Electric</option>
                     <option value="AC">AC</option>
@@ -614,6 +609,7 @@ export default function BusManagementPage({
                     value={form.capacity}
                     onChange={(e) => setForm({ ...form, capacity: e.target.value })}
                     required
+                    disabled={isSubmitting}
                   />
                   {formErrors.capacity && <span style={{ color: "#a33c2c", fontSize: "9px" }}>{formErrors.capacity}</span>}
                 </label>
@@ -624,6 +620,7 @@ export default function BusManagementPage({
                   <select
                     value={form.depot}
                     onChange={(e) => setForm({ ...form, depot: e.target.value })}
+                    disabled={isSubmitting}
                   >
                     <option value="BBM Depot">BBM Depot</option>
                     <option value="Sarojini Nagar Depot">Sarojini Nagar Depot</option>
@@ -642,6 +639,7 @@ export default function BusManagementPage({
                     value={form.manufacturer}
                     onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
                     placeholder="e.g. Tata Motors"
+                    disabled={isSubmitting}
                   />
                 </label>
 
@@ -654,6 +652,7 @@ export default function BusManagementPage({
                     max={new Date().getFullYear() + 1}
                     value={form.modelYear}
                     onChange={(e) => setForm({ ...form, modelYear: e.target.value })}
+                    disabled={isSubmitting}
                   />
                 </label>
 
@@ -663,6 +662,7 @@ export default function BusManagementPage({
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    disabled={isSubmitting}
                   >
                     <option value="Active">Active</option>
                     <option value="Maintenance">Maintenance</option>
@@ -676,6 +676,7 @@ export default function BusManagementPage({
                   <select
                     value={form.routeId}
                     onChange={(e) => setForm({ ...form, routeId: e.target.value })}
+                    disabled={isSubmitting}
                   >
                     <option value="">Unassigned (No route assigned)</option>
                     {routes.map((r) => (
@@ -692,6 +693,7 @@ export default function BusManagementPage({
                   <select
                     value={form.driverId}
                     onChange={(e) => setForm({ ...form, driverId: e.target.value })}
+                    disabled={isSubmitting}
                   >
                     <option value="">Unassigned (No driver assigned)</option>
                     {drivers.map((d) => (
@@ -706,11 +708,11 @@ export default function BusManagementPage({
               {error && <div role="alert" className="form-alert">{error}</div>}
 
               <div className="modal-actions" style={{ marginTop: "16px" }}>
-                <button type="button" className="button button-quiet" onClick={closeModal}>
+                <button type="button" className="button button-quiet" onClick={closeModal} disabled={isSubmitting}>
                   Cancel
                 </button>
-                <button type="submit" className="button button-primary">
-                  {modalMode === "add" ? "Save bus to fleet" : "Save changes"}
+                <button type="submit" className="button button-primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : modalMode === "add" ? "Save bus to fleet" : "Save changes"}
                 </button>
               </div>
             </form>
@@ -816,7 +818,7 @@ export default function BusManagementPage({
                 </div>
 
                 <div className="detail-card full-span" style={{ background: "#fafbfc" }}>
-                  <span>Timestamps</span>
+                  <span>Database Timestamps</span>
                   <small>
                     Created: {new Date(activeBus.createdAt || Date.now()).toLocaleString("en-IN")} ·
                     Last Updated: {new Date(activeBus.updatedAt || Date.now()).toLocaleString("en-IN")}
@@ -850,7 +852,7 @@ export default function BusManagementPage({
           className="modal-backdrop"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setDeleteTarget(null);
+            if (e.target === e.currentTarget && !isSubmitting) setDeleteTarget(null);
           }}
         >
           <section className="bus-modal" role="dialog" aria-modal="true" style={{ width: "min(100%, 420px)" }}>
@@ -859,7 +861,7 @@ export default function BusManagementPage({
                 <span className="eyebrow" style={{ color: "#d76650" }}>DECOMMISSION / REMOVE</span>
                 <h2>Delete Bus {deleteTarget.busNumber}?</h2>
               </div>
-              <button onClick={() => setDeleteTarget(null)} aria-label="Close dialog">
+              <button onClick={() => setDeleteTarget(null)} aria-label="Close dialog" disabled={isSubmitting}>
                 <X size={19} />
               </button>
             </div>
@@ -868,7 +870,12 @@ export default function BusManagementPage({
               <strong>{deleteTarget.registrationNumber}</strong>) from the DTC fleet database? This action cannot be undone.
             </p>
             <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button type="button" className="button button-quiet" onClick={() => setDeleteTarget(null)}>
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isSubmitting}
+              >
                 Cancel
               </button>
               <button
@@ -876,8 +883,9 @@ export default function BusManagementPage({
                 className="button"
                 style={{ background: "#c53030", color: "#fff" }}
                 onClick={confirmDelete}
+                disabled={isSubmitting}
               >
-                Confirm Delete
+                {isSubmitting ? "Deleting..." : "Confirm Delete"}
               </button>
             </div>
           </section>
