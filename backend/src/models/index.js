@@ -2,6 +2,7 @@ import sequelize from "../config/database.js";
 import Bus from "./Bus.js";
 import Route from "./Route.js";
 import Driver from "./Driver.js";
+import Crew from "./Crew.js";
 
 // Establish relationships
 // A Bus optionally belongs to a Route
@@ -30,12 +31,14 @@ export {
   sequelize,
   Bus,
   Route,
-  Driver
+  Driver,
+  Crew
 };
 
 export default {
   sequelize,
   Bus,
   Route,
-  Driver
+  Driver,
+  Crew
 };
