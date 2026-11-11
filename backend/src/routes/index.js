@@ -1,5 +1,6 @@
 import { Router } from "express";
 import busRoutes from "./busRoutes.js";
+import crewRoutes from "./crewRoutes.js";
 import { getAllRoutes, getAllDrivers } from "../controllers/auxController.js";
 
 const apiRouter = Router();
@@ -15,6 +16,7 @@ apiRouter.get("/health", (req, res) => {
 
 // Mount modules
 apiRouter.use("/buses", busRoutes);
+apiRouter.use("/crew", crewRoutes);
 apiRouter.get("/routes", getAllRoutes);
 apiRouter.get("/drivers", getAllDrivers);
 

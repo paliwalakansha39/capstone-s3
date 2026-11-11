@@ -24,4 +24,12 @@ This document tracks all project contributions across the three core academic su
 - **Files Created**:
   - `backend/src/middleware/crewValidationMiddleware.js`: Implemented validation middleware for `createCrew` and `updateCrew` requests, enforcing role constraints (Driver vs. Conductor), license presence for drivers, badge uniqueness validation, phone format checking, and status verification (`Available`, `On Duty`, `On Rest`, `On Leave`).
 
+### Commit 4: Crew Management & Availability REST APIs (Subject: ASD)
+- **Files Created**:
+  - `backend/src/controllers/crewController.js`: Implemented `getAllCrew` (with search and filters for role, depot, status, and pagination), `getCrewAvailabilityStats` (analytics on available drivers/conductors and on-duty/rest ratios), `getCrewById`, `createCrew`, `updateCrew`, and `deleteCrew` (blocking deletion of on-duty crew).
+  - `backend/src/routes/crewRoutes.js`: Defined REST routes for `/api/crew`, connecting admin authorization and validation middlewares.
+- **Files Modified**:
+  - `backend/src/routes/index.js`: Mounted `/api/crew` route hierarchy into main Express API router.
+
+
 
