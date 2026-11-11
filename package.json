@@ -1,0 +1,12 @@
+{
+  "name": "dtc-bus-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DTC Bus Management System - Capstone Project",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "test:backend": "npm run test --prefix backend"
+  }
+}

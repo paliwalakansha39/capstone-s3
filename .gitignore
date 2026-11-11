@@ -6,3 +6,7 @@ dist/
 coverage/
 .DS_Store
 npm-debug.log*
+*.sqlite
+*.sqlite3
+backend/data/*.sqlite
+

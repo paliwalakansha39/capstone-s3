@@ -1,31 +1,48 @@
-# DTC Bus Management System — Frontend Demo
+# DTC Bus Management System
 
-This frontend-only preview includes a DTC landing page, demo sign-in, a
-dashboard, admin profile, and locally stored user-management interactions.
-Bus, route, and duty scheduling features are not included.
+A comprehensive public transit operations and fleet management platform for Delhi Transport Corporation (DTC).
 
-## Run locally
+## Project Modules & Breakdown
+- **Chunk 1 — Core Portal & User Management (Member 1)**: DTC landing page, demo authentication, administrator dashboard, profile management, and workspace users.
+- **Chunk 2 — Bus Management System (Member 2)**: Fullstack fleet management featuring Bus database models, database migrations, RESTful APIs, and responsive admin UI with complete CRUD operations, search, filters, modal inspector, and validation.
+- **Future Chunks**: Route Management & Duty Scheduling.
 
-Requirements: Node.js 20+ and npm.
+## Technology Stack
+- **Frontend**: React 19, Vite, React Router DOM 7, Lucide React, Custom Responsive CSS (DTC Design System).
+- **Backend**: Node.js, Express, Sequelize ORM, SQLite3, CORS, Dotenv.
+- **Database**: SQLite (portable, zero-configuration local database with referential integrity).
 
+---
+
+## Getting Started
+
+### Requirements
+- Node.js 20+
+- npm
+
+### 1. Backend Setup
+```sh
+cd backend
+npm install
+npm run migrate
+npm run seed
+npm run dev
+```
+Backend runs on `http://localhost:5001`.
+
+### 2. Frontend Setup
 ```sh
 cd frontend
 npm install
 npm run dev
 ```
+Frontend runs on `http://localhost:5173` (proxies `/api` requests to `http://localhost:5001`).
 
-Open the Vite URL (normally `http://localhost:5173`). On the sign-in page,
-enter any valid email address and a password of at least 8 characters. The
-dashboard session, sample users, and user changes are stored in that browser's
-local storage.
+---
 
-Use `npm run build` to create the production build and `npm run preview` to
-serve it locally.
-
-## Demo limitations
-
-This is a UI prototype only. Sign-in is not real authentication, browser-local
-data is not shared or backed up, and this application must not be used to
-protect real accounts or operational data. A production deployment needs a
-properly secured backend and database.
-# capstone-s3
+## Bus Management API Endpoints
+- `GET /api/buses` — List all buses (supports search, status/type filters, pagination)
+- `GET /api/buses/:id` — Retrieve bus details by ID
+- `POST /api/buses` — Create a new bus record (with unique constraints and validation)
+- `PUT /api/buses/:id` — Update existing bus record
+- `DELETE /api/buses/:id` — Delete bus record safely
