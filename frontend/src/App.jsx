@@ -8,6 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import ProfilePage from "./pages/ProfilePage";
 import UsersPage from "./pages/UsersPage";
+import BusManagementPage from "./pages/BusManagementPage";
 
 export default function App() {
   const { admin, login, logout } = useAuth();
@@ -20,7 +21,7 @@ export default function App() {
       <Route index element={<DashboardPage />} />
       <Route path="profile" element={<ProfilePage />} />
       <Route path="users" element={<UsersPage />} />
-      <Route path="buses" element={<PlaceholderPage title="Bus Management" />} />
+      <Route path="buses" element={<BusManagementPage />} />
       <Route path="routes" element={<PlaceholderPage title="Route Management" />} />
       <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
     </Route>
