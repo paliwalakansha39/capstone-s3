@@ -229,3 +229,201 @@ export async function createTrip(req, res, next) {
     next(error);
   }
 }
+
+/**
+ * GET /api/trips/:id
+ * Retrieve single trip by ID with associations
+ */
+export async function getTripById(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const trip = await Trip.findByPk(id, {
+      include: [
+        {
+          model: Route,
+          as: "route",
+          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint", "totalDistanceKm"]
+        },
+        {
+          model: Bus,
+          as: "bus",
+          attributes: ["id", "busNumber", "registrationNumber", "busType", "capacity", "depot", "status"]
+        }
+      ]
+    });
+
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        error: `Trip with ID '${id}' was not found.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: trip
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PUT /api/trips/:id
+ * Update an existing trip schedule
+ */
+export async function updateTrip(req, res, next) {
+  try {
+    const { id } = req.params;
+    const {
+      routeId,
+      busId,
+      tripDate,
+      departureTime,
+      arrivalTime,
+      startingStop,
+      destinationStop,
+      status,
+      isOvernight
+    } = req.body;
+
+    const trip = await Trip.findByPk(id);
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        error: `Trip with ID '${id}' was not found.`
+      });
+    }
+
+    const targetRouteId = routeId !== undefined ? routeId.trim() : trip.routeId;
+    const targetBusId = busId !== undefined ? busId.trim() : trip.busId;
+    const targetTripDate = tripDate !== undefined ? tripDate.trim() : trip.tripDate;
+    const targetDepartureTime = departureTime !== undefined ? departureTime.trim() : trip.departureTime;
+    const targetArrivalTime = arrivalTime !== undefined ? arrivalTime.trim() : trip.arrivalTime;
+    const targetStatus = status !== undefined ? status.trim() : trip.status;
+
+    // Verify route if updated
+    if (routeId !== undefined && targetRouteId !== trip.routeId) {
+      const route = await Route.findByPk(targetRouteId);
+      if (!route) {
+        return res.status(404).json({
+          success: false,
+          error: `Referenced route with ID '${targetRouteId}' was not found.`
+        });
+      }
+    }
+
+    // Verify bus if updated or checked
+    if (busId !== undefined && targetBusId !== trip.busId) {
+      const bus = await Bus.findByPk(targetBusId);
+      if (!bus) {
+        return res.status(404).json({
+          success: false,
+          error: `Referenced bus with ID '${targetBusId}' was not found.`
+        });
+      }
+      if (bus.status === "Maintenance" || bus.status === "Inactive") {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot assign bus '${bus.busNumber}': bus is currently in '${bus.status}' status.`
+        });
+      }
+    }
+
+    // Check conflict if timing, date, bus, or status changed
+    if (targetStatus !== "Cancelled") {
+      const conflict = await findBusTripConflict({
+        busId: targetBusId,
+        tripDate: targetTripDate,
+        departureTime: targetDepartureTime,
+        arrivalTime: targetArrivalTime,
+        excludeTripId: trip.id,
+        isOvernight: Boolean(isOvernight)
+      });
+
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          error: `Bus is already assigned to an overlapping trip (${conflict.departureTime} - ${conflict.arrivalTime}) on date ${conflict.tripDate}.`,
+          conflictTrip: {
+            id: conflict.id,
+            tripDate: conflict.tripDate,
+            departureTime: conflict.departureTime,
+            arrivalTime: conflict.arrivalTime,
+            status: conflict.status
+          }
+        });
+      }
+    }
+
+    // Update trip fields
+    if (routeId !== undefined) trip.routeId = targetRouteId;
+    if (busId !== undefined) trip.busId = targetBusId;
+    if (tripDate !== undefined) trip.tripDate = targetTripDate;
+    if (departureTime !== undefined) trip.departureTime = targetDepartureTime;
+    if (arrivalTime !== undefined) trip.arrivalTime = targetArrivalTime;
+    if (startingStop !== undefined) trip.startingStop = startingStop.trim();
+    if (destinationStop !== undefined) trip.destinationStop = destinationStop.trim();
+    if (status !== undefined) trip.status = targetStatus;
+
+    await trip.save();
+
+    const completeTrip = await Trip.findByPk(trip.id, {
+      include: [
+        {
+          model: Route,
+          as: "route",
+          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint"]
+        },
+        {
+          model: Bus,
+          as: "bus",
+          attributes: ["id", "busNumber", "registrationNumber", "busType", "status"]
+        }
+      ]
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Trip schedule updated successfully.",
+      data: completeTrip
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/trips/:id
+ * Delete a trip schedule
+ */
+export async function deleteTrip(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const trip = await Trip.findByPk(id);
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        error: `Trip with ID '${id}' was not found.`
+      });
+    }
+
+    if (trip.status === "In Progress") {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot delete an active trip that is currently 'In Progress'. Mark as Completed or Cancelled first."
+      });
+    }
+
+    await trip.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: "Trip schedule deleted successfully."
+    });
+  } catch (error) {
+    next(error);
+  }
+}
