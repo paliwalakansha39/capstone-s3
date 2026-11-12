@@ -272,6 +272,14 @@ td{height:52px;border-top:1px solid #f0f2f3;font-size:9px;color:#687984}
 .status-maintenance i{background:#f59e0b}
 .status-inactive{background:#f3f4f6;color:#4b5563}
 .status-inactive i{background:#9ca3af}
+.status-scheduled{background:#eff6ff;color:#1d4ed8}
+.status-scheduled i{background:#3b82f6}
+.status-inprogress{background:#fffbeb;color:#b45309}
+.status-inprogress i{background:#f59e0b}
+.status-completed{background:#ecfdf5;color:#047857}
+.status-completed i{background:#10b981}
+.status-cancelled{background:#fef2f2;color:#b91c1c}
+.status-cancelled i{background:#ef4444}
 .bus-type-badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:600}
 .type-electric{background:#ecfeff;color:#0e7490;border:1px solid #cffafe}
 .type-ac{background:#eff6ff;color:#1d4ed8;border:1px solid #dbeafe}
