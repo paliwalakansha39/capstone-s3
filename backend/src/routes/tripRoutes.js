@@ -5,7 +5,9 @@ import {
   getTripById,
   createTrip,
   updateTrip,
-  deleteTrip
+  deleteTrip,
+  checkBusAvailability,
+  getAvailableBuses
 } from "../controllers/tripController.js";
 import { requireAdminAuth } from "../middleware/authMiddleware.js";
 import {
@@ -17,6 +19,8 @@ const router = Router();
 
 // Public / operational retrieval endpoints
 router.get("/stats", getTripStats);
+router.get("/bus-availability", checkBusAvailability);
+router.get("/available-buses", getAvailableBuses);
 router.get("/", getAllTrips);
 router.get("/:id", getTripById);
 

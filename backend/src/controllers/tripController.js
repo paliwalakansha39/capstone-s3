@@ -427,3 +427,164 @@ export async function deleteTrip(req, res, next) {
     next(error);
   }
 }
+
+/**
+ * GET /api/trips/bus-availability
+ * Check if a specific bus is available for a trip time window
+ */
+export async function checkBusAvailability(req, res, next) {
+  try {
+    const { busId, tripDate, departureTime, arrivalTime, excludeTripId, isOvernight } = req.query;
+
+    if (!busId || !tripDate || !departureTime || !arrivalTime) {
+      return res.status(400).json({
+        success: false,
+        error: "busId, tripDate, departureTime, and arrivalTime query parameters are required."
+      });
+    }
+
+    const bus = await Bus.findByPk(busId.trim());
+    if (!bus) {
+      return res.status(404).json({
+        success: false,
+        error: `Bus with ID '${busId}' was not found.`
+      });
+    }
+
+    if (bus.status === "Maintenance" || bus.status === "Inactive") {
+      return res.status(200).json({
+        success: true,
+        data: {
+          available: false,
+          reason: `Bus is currently in '${bus.status}' status.`,
+          bus: {
+            id: bus.id,
+            busNumber: bus.busNumber,
+            status: bus.status
+          }
+        }
+      });
+    }
+
+    const conflict = await findBusTripConflict({
+      busId: bus.id,
+      tripDate: tripDate.trim(),
+      departureTime: departureTime.trim(),
+      arrivalTime: arrivalTime.trim(),
+      excludeTripId: excludeTripId ? excludeTripId.trim() : null,
+      isOvernight: isOvernight === "true" || isOvernight === true
+    });
+
+    if (conflict) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          available: false,
+          reason: `Bus '${bus.busNumber}' is assigned to an overlapping trip (${conflict.departureTime} - ${conflict.arrivalTime}) on ${conflict.tripDate}.`,
+          conflictTrip: {
+            id: conflict.id,
+            tripDate: conflict.tripDate,
+            departureTime: conflict.departureTime,
+            arrivalTime: conflict.arrivalTime,
+            status: conflict.status,
+            route: conflict.route
+          },
+          bus: {
+            id: bus.id,
+            busNumber: bus.busNumber,
+            status: bus.status
+          }
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        available: true,
+        reason: "Bus is available for assignment.",
+        bus: {
+          id: bus.id,
+          busNumber: bus.busNumber,
+          status: bus.status
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/trips/available-buses
+ * Get all buses with their availability status for a specific date and time slot
+ */
+export async function getAvailableBuses(req, res, next) {
+  try {
+    const { tripDate, departureTime, arrivalTime, excludeTripId, isOvernight } = req.query;
+
+    const allBuses = await Bus.findAll({
+      order: [["busNumber", "ASC"]]
+    });
+
+    if (!tripDate || !departureTime || !arrivalTime) {
+      return res.status(200).json({
+        success: true,
+        data: allBuses.map((bus) => ({
+          ...bus.toJSON(),
+          isAvailable: bus.status === "Active",
+          unavailableReason: bus.status !== "Active" ? `Bus is in ${bus.status} status` : null
+        }))
+      });
+    }
+
+    const busesWithStatus = await Promise.all(
+      allBuses.map(async (bus) => {
+        const busJson = bus.toJSON();
+        if (bus.status !== "Active") {
+          return {
+            ...busJson,
+            isAvailable: false,
+            unavailableReason: `Bus is in ${bus.status} status`
+          };
+        }
+
+        const conflict = await findBusTripConflict({
+          busId: bus.id,
+          tripDate: tripDate.trim(),
+          departureTime: departureTime.trim(),
+          arrivalTime: arrivalTime.trim(),
+          excludeTripId: excludeTripId ? excludeTripId.trim() : null,
+          isOvernight: isOvernight === "true" || isOvernight === true
+        });
+
+        if (conflict) {
+          return {
+            ...busJson,
+            isAvailable: false,
+            unavailableReason: `Busy with trip (${conflict.departureTime} - ${conflict.arrivalTime})`,
+            conflictTrip: {
+              id: conflict.id,
+              departureTime: conflict.departureTime,
+              arrivalTime: conflict.arrivalTime,
+              route: conflict.route
+            }
+          };
+        }
+
+        return {
+          ...busJson,
+          isAvailable: true,
+          unavailableReason: null
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: busesWithStatus
+    });
+  } catch (error) {
+    next(error);
+  }
+}
