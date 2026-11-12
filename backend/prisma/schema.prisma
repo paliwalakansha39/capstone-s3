@@ -30,3 +30,34 @@ model User {
 
   @@map("users")
 }
+
+model Route {
+  id                  String     @id @default(uuid())
+  routeNumber         String     @unique @db.VarChar(30)
+  routeName           String     @db.VarChar(120)
+  startingPoint       String     @db.VarChar(120)
+  destination         String     @db.VarChar(120)
+  totalDistance       Float
+  estimatedTravelTime Int
+  stops               BusStop[]
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@map("routes")
+}
+
+model BusStop {
+  id             String   @id @default(uuid())
+  stopName       String   @db.VarChar(120)
+  latitude       Float
+  longitude      Float
+  sequenceNumber Int
+  routeId        String
+  route          Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([routeId, sequenceNumber])
+  @@index([routeId, sequenceNumber])
+  @@map("bus_stops")
+}
