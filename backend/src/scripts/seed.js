@@ -1,4 +1,4 @@
-import { sequelize, Bus, Route, Driver, Crew } from "../models/index.js";
+import { sequelize, Bus, Route, Driver, Crew, Trip } from "../models/index.js";
 import { runMigrations } from "./migrate.js";
 
 export async function seedDatabase() {
@@ -160,149 +160,234 @@ export async function seedDatabase() {
   }
 
   const existingBuses = await Bus.count();
-  if (existingBuses > 0) {
+  if (existingBuses === 0) {
+    console.log("Seeding sample DTC routes, drivers, and buses...");
+
+    // Seed sample DTC routes
+    const route1 = await Route.create({
+      routeNumber: "419",
+      routeName: "Ambedkar Nagar to Old Delhi Railway Station",
+      startPoint: "Ambedkar Nagar Terminal",
+      endPoint: "Old Delhi Railway Station",
+      totalDistanceKm: 24.5
+    });
+
+    const route2 = await Route.create({
+      routeNumber: "502",
+      routeName: "Mehrauli to Mori Gate Terminal",
+      startPoint: "Mehrauli Terminal",
+      endPoint: "Mori Gate Terminal",
+      totalDistanceKm: 27.2
+    });
+
+    const route3 = await Route.create({
+      routeNumber: "761",
+      routeName: "Uttam Nagar to Manglapuri",
+      startPoint: "Uttam Nagar Terminal",
+      endPoint: "Manglapuri",
+      totalDistanceKm: 18.0
+    });
+
+    const route4 = await Route.create({
+      routeNumber: "Airport Exp-4",
+      routeName: "ISBT Kashmere Gate to IGI Airport T3",
+      startPoint: "ISBT Kashmere Gate",
+      endPoint: "IGI Airport Terminal 3",
+      totalDistanceKm: 31.8
+    });
+
+    // Seed sample DTC drivers
+    const driver1 = await Driver.create({
+      name: "Rajesh Kumar",
+      badgeNumber: "DTC-D-4512",
+      licenseNumber: "DL0420100098451",
+      phone: "+91 98112 34567",
+      status: "On Duty"
+    });
+
+    const driver2 = await Driver.create({
+      name: "Sunil Verma",
+      badgeNumber: "DTC-D-5104",
+      licenseNumber: "DL0420120014782",
+      phone: "+91 98734 56123",
+      status: "On Duty"
+    });
+
+    const driver3 = await Driver.create({
+      name: "Manoj Singh",
+      badgeNumber: "DTC-D-3891",
+      licenseNumber: "DL0420080034129",
+      phone: "+91 99102 98456",
+      status: "Available"
+    });
+
+    // Seed initial fleet of DTC buses
+    const sampleBuses = [
+      {
+        busNumber: "DTC-1041",
+        registrationNumber: "DL 01 EA 2041",
+        busType: "Electric",
+        capacity: 42,
+        depot: "BBM Depot",
+        modelYear: 2023,
+        manufacturer: "Tata Motors",
+        status: "Active",
+        routeId: route1.id,
+        driverId: driver1.id
+      },
+      {
+        busNumber: "DTC-1042",
+        registrationNumber: "DL 01 EA 2042",
+        busType: "Electric",
+        capacity: 42,
+        depot: "BBM Depot",
+        modelYear: 2023,
+        manufacturer: "Tata Motors",
+        status: "Active",
+        routeId: route2.id,
+        driverId: driver2.id
+      },
+      {
+        busNumber: "DTC-2105",
+        registrationNumber: "DL 01 PC 7812",
+        busType: "AC",
+        capacity: 38,
+        depot: "Sarojini Nagar Depot",
+        modelYear: 2022,
+        manufacturer: "Ashok Leyland",
+        status: "Active",
+        routeId: route4.id,
+        driverId: driver3.id
+      },
+      {
+        busNumber: "DTC-3401",
+        registrationNumber: "DL 01 PC 9014",
+        busType: "Low Floor",
+        capacity: 45,
+        depot: "Rohini Depot-I",
+        modelYear: 2021,
+        manufacturer: "Tata Motors",
+        status: "Maintenance",
+        routeId: route3.id,
+        driverId: null
+      },
+      {
+        busNumber: "DTC-4089",
+        registrationNumber: "DL 01 PC 5532",
+        busType: "Non-AC",
+        capacity: 50,
+        depot: "Mayapuri Depot",
+        modelYear: 2019,
+        manufacturer: "Ashok Leyland",
+        status: "Inactive",
+        routeId: null,
+        driverId: null
+      },
+      {
+        busNumber: "DTC-5120",
+        registrationNumber: "DL 01 EA 3120",
+        busType: "Electric",
+        capacity: 42,
+        depot: "Kushak Nallah Depot",
+        modelYear: 2024,
+        manufacturer: "JBM Auto",
+        status: "Active",
+        routeId: route1.id,
+        driverId: null
+      }
+    ];
+
+    await Bus.bulkCreate(sampleBuses);
+    console.log(`Successfully seeded ${sampleBuses.length} buses.`);
+  } else {
     console.log(`Database already has ${existingBuses} buses. Skipping bus seeding.`);
-    return;
   }
 
-  console.log("Seeding sample DTC routes, drivers, and buses...");
+  // Seed sample DTC trips
+  const existingTrips = await Trip.count();
+  if (existingTrips === 0) {
+    console.log("Seeding sample DTC trip schedules...");
+    const route419 = await Route.findOne({ where: { routeNumber: "419" } });
+    const route502 = await Route.findOne({ where: { routeNumber: "502" } });
+    const routeAirport = await Route.findOne({ where: { routeNumber: "Airport Exp-4" } });
+    const route761 = await Route.findOne({ where: { routeNumber: "761" } });
 
-  // Seed sample DTC routes
-  const route1 = await Route.create({
-    routeNumber: "419",
-    routeName: "Ambedkar Nagar to Old Delhi Railway Station",
-    startPoint: "Ambedkar Nagar Terminal",
-    endPoint: "Old Delhi Railway Station",
-    totalDistanceKm: 24.5
-  });
+    const bus1041 = await Bus.findOne({ where: { busNumber: "DTC-1041" } });
+    const bus1042 = await Bus.findOne({ where: { busNumber: "DTC-1042" } });
+    const bus2105 = await Bus.findOne({ where: { busNumber: "DTC-2105" } });
+    const bus5120 = await Bus.findOne({ where: { busNumber: "DTC-5120" } });
 
-  const route2 = await Route.create({
-    routeNumber: "502",
-    routeName: "Mehrauli to Mori Gate Terminal",
-    startPoint: "Mehrauli Terminal",
-    endPoint: "Mori Gate Terminal",
-    totalDistanceKm: 27.2
-  });
+    if (route419 && bus1041) {
+      const today = new Date().toISOString().slice(0, 10);
+      const sampleTrips = [
+        {
+          routeId: route419.id,
+          busId: bus1041.id,
+          tripDate: today,
+          departureTime: "07:30",
+          arrivalTime: "09:00",
+          startingStop: route419.startPoint,
+          destinationStop: route419.endPoint,
+          status: "Scheduled"
+        },
+        {
+          routeId: route419.id,
+          busId: bus1041.id,
+          tripDate: today,
+          departureTime: "10:30",
+          arrivalTime: "12:00",
+          startingStop: route419.endPoint,
+          destinationStop: route419.startPoint,
+          status: "Scheduled"
+        },
+        ...(route502 && bus1042
+          ? [
+              {
+                routeId: route502.id,
+                busId: bus1042.id,
+                tripDate: today,
+                departureTime: "08:15",
+                arrivalTime: "09:45",
+                startingStop: route502.startPoint,
+                destinationStop: route502.endPoint,
+                status: "In Progress"
+              }
+            ]
+          : []),
+        ...(routeAirport && bus2105
+          ? [
+              {
+                routeId: routeAirport.id,
+                busId: bus2105.id,
+                tripDate: today,
+                departureTime: "06:00",
+                arrivalTime: "07:30",
+                startingStop: routeAirport.startPoint,
+                destinationStop: routeAirport.endPoint,
+                status: "Completed"
+              }
+            ]
+          : []),
+        ...(route761 && bus5120
+          ? [
+              {
+                routeId: route761.id,
+                busId: bus5120.id,
+                tripDate: today,
+                departureTime: "11:00",
+                arrivalTime: "12:15",
+                startingStop: route761.startPoint,
+                destinationStop: route761.endPoint,
+                status: "Cancelled"
+              }
+            ]
+          : [])
+      ];
 
-  const route3 = await Route.create({
-    routeNumber: "761",
-    routeName: "Uttam Nagar to Manglapuri",
-    startPoint: "Uttam Nagar Terminal",
-    endPoint: "Manglapuri",
-    totalDistanceKm: 18.0
-  });
-
-  const route4 = await Route.create({
-    routeNumber: "Airport Exp-4",
-    routeName: "ISBT Kashmere Gate to IGI Airport T3",
-    startPoint: "ISBT Kashmere Gate",
-    endPoint: "IGI Airport Terminal 3",
-    totalDistanceKm: 31.8
-  });
-
-  // Seed sample DTC drivers
-  const driver1 = await Driver.create({
-    name: "Rajesh Kumar",
-    badgeNumber: "DTC-D-4512",
-    licenseNumber: "DL0420100098451",
-    phone: "+91 98112 34567",
-    status: "On Duty"
-  });
-
-  const driver2 = await Driver.create({
-    name: "Sunil Verma",
-    badgeNumber: "DTC-D-5104",
-    licenseNumber: "DL0420120014782",
-    phone: "+91 98734 56123",
-    status: "On Duty"
-  });
-
-  const driver3 = await Driver.create({
-    name: "Manoj Singh",
-    badgeNumber: "DTC-D-3891",
-    licenseNumber: "DL0420080034129",
-    phone: "+91 99102 98456",
-    status: "Available"
-  });
-
-  // Seed initial fleet of DTC buses
-  const sampleBuses = [
-    {
-      busNumber: "DTC-1041",
-      registrationNumber: "DL 01 EA 2041",
-      busType: "Electric",
-      capacity: 42,
-      depot: "BBM Depot",
-      modelYear: 2023,
-      manufacturer: "Tata Motors",
-      status: "Active",
-      routeId: route1.id,
-      driverId: driver1.id
-    },
-    {
-      busNumber: "DTC-1042",
-      registrationNumber: "DL 01 EA 2042",
-      busType: "Electric",
-      capacity: 42,
-      depot: "BBM Depot",
-      modelYear: 2023,
-      manufacturer: "Tata Motors",
-      status: "Active",
-      routeId: route2.id,
-      driverId: driver2.id
-    },
-    {
-      busNumber: "DTC-2105",
-      registrationNumber: "DL 01 PC 7812",
-      busType: "AC",
-      capacity: 38,
-      depot: "Sarojini Nagar Depot",
-      modelYear: 2022,
-      manufacturer: "Ashok Leyland",
-      status: "Active",
-      routeId: route4.id,
-      driverId: driver3.id
-    },
-    {
-      busNumber: "DTC-3401",
-      registrationNumber: "DL 01 PC 9014",
-      busType: "Low Floor",
-      capacity: 45,
-      depot: "Rohini Depot-I",
-      modelYear: 2021,
-      manufacturer: "Tata Motors",
-      status: "Maintenance",
-      routeId: route3.id,
-      driverId: null
-    },
-    {
-      busNumber: "DTC-4089",
-      registrationNumber: "DL 01 PC 5532",
-      busType: "Non-AC",
-      capacity: 50,
-      depot: "Mayapuri Depot",
-      modelYear: 2019,
-      manufacturer: "Ashok Leyland",
-      status: "Inactive",
-      routeId: null,
-      driverId: null
-    },
-    {
-      busNumber: "DTC-5120",
-      registrationNumber: "DL 01 EA 3120",
-      busType: "Electric",
-      capacity: 42,
-      depot: "Kushak Nallah Depot",
-      modelYear: 2024,
-      manufacturer: "JBM Auto",
-      status: "Active",
-      routeId: route1.id,
-      driverId: null
+      await Trip.bulkCreate(sampleTrips);
+      console.log(`Successfully seeded ${sampleTrips.length} sample trips.`);
     }
-  ];
-
-  await Bus.bulkCreate(sampleBuses);
-  console.log(`Successfully seeded ${sampleBuses.length} buses.`);
+  }
 }
 
 if (process.argv[1] && process.argv[1].endsWith("seed.js")) {
