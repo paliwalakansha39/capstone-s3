@@ -1,6 +1,6 @@
 import L from "leaflet";
 import { CirclePlus, Clock3, MapPin, Pencil, Plus, Route as RouteIcon, Search, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { createRoute, deleteRoute, getRoutes, updateRoute } from "../services/routeService";
@@ -78,20 +78,25 @@ export default function RouteManagementPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [formError, setFormError] = useState("");
+  const loadSequence = useRef(0);
 
   const selectedRoute = routes.find((route) => route.id === selectedId) || routes[0] || null;
 
   const loadRoutes = useCallback(async (query = "") => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setError("");
     try {
       const data = await getRoutes(query);
+      if (sequence !== loadSequence.current) return;
       setRoutes(data);
       setSelectedId((current) => data.some((route) => route.id === current) ? current : data[0]?.id || "");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.message || "Could not load routes.");
+      if (sequence === loadSequence.current) {
+        setError(requestError.response?.data?.error || requestError.message || "Could not load routes.");
+      }
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, []);
 
@@ -251,13 +256,20 @@ export default function RouteManagementPage() {
           <MapContainer center={DELHI_CENTER} zoom={11} scrollWheelZoom>
             <MapContent route={selectedRoute} />
           </MapContainer>
-          {!selectedRoute && <div className="map-empty-hint">Add verified bus stop coordinates to plot a route.</div>}
+          {(!selectedRoute || !selectedRoute.stops.length) && <div className="map-empty-hint">Add verified bus stop coordinates to plot a route.</div>}
         </div>
         {selectedRoute && <div className="route-summary">
           <div><RouteIcon size={15} /><span><strong>{selectedRoute.totalDistance} km</strong> distance</span></div>
           <div><Clock3 size={15} /><span><strong>{selectedRoute.estimatedTravelTime} min</strong> travel time</span></div>
           <div><MapPin size={15} /><span><strong>{selectedRoute.stops.length}</strong> ordered stops</span></div>
         </div>}
+        {selectedRoute?.stops.length > 0 && <ol className="route-stop-order">
+          {selectedRoute.stops.map((stop, index) => <li key={stop.id}>
+            <span>{stop.sequenceNumber}</span>
+            <div><strong>{stop.stopName}</strong><small>{index === 0 ? `Start · ${selectedRoute.startingPoint}` : index === selectedRoute.stops.length - 1 ? `Destination · ${selectedRoute.destination}` : "Bus stop"}</small></div>
+            <code>{stop.latitude.toFixed(5)}, {stop.longitude.toFixed(5)}</code>
+          </li>)}
+        </ol>}
       </section>
     </div>
 
