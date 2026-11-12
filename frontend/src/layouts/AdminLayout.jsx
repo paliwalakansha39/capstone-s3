@@ -58,7 +58,7 @@ export default function AdminLayout({ admin, logout, context }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-status"><span className="status-dot" /> Local demo workspace</div>
+          <div className="sidebar-status"><span className="status-dot" /> Secure admin session</div>
           <button className="nav-link logout-link" onClick={handleLogout}>
             <LogOut size={18} /><span>Log out</span>
           </button>

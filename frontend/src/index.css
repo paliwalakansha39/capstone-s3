@@ -159,7 +159,7 @@ button{cursor:pointer}
 .welcome-row p,.page-heading p{font-size:11px;color:#81909a;margin:0}
 .welcome-mark{width:51px;height:51px;border:1px solid #e3e9eb;display:grid;place-items:center;border-radius:50%;color:#697e8a;font:700 13px Manrope;position:relative}
 .welcome-mark:after{content:"";position:absolute;right:0;top:1px;width:8px;height:8px;background:var(--orange);border:2px solid #f5f7f8;border-radius:50%}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:13px}
 .stat-card{background:#fff;border:1px solid #e9edef;padding:17px 17px 14px;min-height:122px}
 .stat-top{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#6f7f89}
 .stat-icon{display:grid;place-items:center;width:30px;height:30px;background:#f0f4f5;color:#4c7184}

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
 import { initDatabaseConnection } from "./config/database.js";
 import { runMigrations } from "./scripts/migrate.js";
+import { prisma } from "./config/prisma.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,7 @@ async function startServer() {
     console.log("Initializing database connection...");
     await initDatabaseConnection();
     await runMigrations();
+    await prisma.$connect();
 
     const app = createApp();
     const server = app.listen(PORT, () => {

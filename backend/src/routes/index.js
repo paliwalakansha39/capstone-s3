@@ -2,6 +2,9 @@ import { Router } from "express";
 import busRoutes from "./busRoutes.js";
 import crewRoutes from "./crewRoutes.js";
 import { getAllRoutes, getAllDrivers } from "../controllers/auxController.js";
+import authRoutes from "./authRoutes.js";
+import userRoutes from "./userRoutes.js";
+import dashboardRoutes from "./dashboardRoutes.js";
 
 const apiRouter = Router();
 
@@ -15,6 +18,9 @@ apiRouter.get("/health", (req, res) => {
 });
 
 // Mount modules
+apiRouter.use("/auth", authRoutes);
+apiRouter.use("/users", userRoutes);
+apiRouter.use("/dashboard", dashboardRoutes);
 apiRouter.use("/buses", busRoutes);
 apiRouter.use("/crew", crewRoutes);
 apiRouter.get("/routes", getAllRoutes);

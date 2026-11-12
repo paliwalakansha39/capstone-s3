@@ -2,25 +2,31 @@ import { Activity, ArrowUpRight, BusFront, Clock3, Map, UserCheck, Users, UserRo
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import StatCard from "../components/StatCard";
-import { getBusStats } from "../services/busService";
+import { getDashboardStats } from "../services/dashboardService";
 import { getCrewStats } from "../services/crewService";
 
 export default function DashboardPage() {
   const { admin, users, activity } = useOutletContext();
-  const [busCount, setBusCount] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
   const [crewStats, setCrewStats] = useState(null);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      getBusStats().catch(() => null),
-      getCrewStats().catch(() => null)
-    ]).then(([busData, crewData]) => {
-      if (mounted) {
-        if (busData) setBusCount(busData.total);
-        if (crewData) setCrewStats(crewData);
-      }
-    });
+    getDashboardStats()
+      .then((dashboardData) => {
+        if (mounted) setStats(dashboardData);
+      })
+      .catch((error) => {
+        if (mounted) setStatsError(error.response?.data?.error || error.message);
+      });
+    getCrewStats()
+      .then((crewData) => {
+        if (mounted) setCrewStats(crewData);
+      })
+      .catch((error) => {
+        if (mounted) console.error("Could not load crew availability:", error);
+      });
     return () => {
       mounted = false;
     };
@@ -33,14 +39,16 @@ export default function DashboardPage() {
   return <div className="dashboard-page">
     <div className="welcome-row"><div><span className="eyebrow">{today} <i className="welcome-dot" /> ADMIN OVERVIEW</span><h1>Good day, {admin?.name?.split(" ")[0] || "Administrator"}.</h1><p>Here’s the latest overview of your DTC management workspace.</p></div><div className="welcome-mark"><span>DT</span></div></div>
     <div className="stats-grid">
-      <StatCard icon={BusFront} label="Total buses" value={busCount !== null ? busCount : "..."} note={busCount !== null ? "Connected to fleet DB" : "Fetching fleet data..."} />
+      <StatCard icon={BusFront} label="Total buses" value={stats ? stats.totalBuses : "—"} note={stats ? "Connected to fleet DB" : "Loading dashboard data"} />
+      <StatCard icon={UserRoundCog} label="Total admins" value={stats ? stats.totalAdmins : "—"} note={stats ? "Administrator accounts" : "Loading dashboard data"} />
       <StatCard icon={UserCheck} label="Active crew" value={crewStats ? crewStats.totalCrew : "..."} note={crewStats ? `${crewStats.totalAvailable} available for dispatch` : "Live crew availability"} accent />
-      <StatCard icon={Users} label="Total users" value={users.length} note="Saved in workspace" />
-      <StatCard icon={Map} label="Total routes" value="—" note="Route data · future project chunk" />
+      <StatCard icon={Users} label="Total users" value={stats ? stats.totalUsers : "—"} note={stats ? "Registered system users" : "Loading dashboard data"} />
+      <StatCard icon={Map} label="Total routes" value={stats ? stats.totalRoutes : "—"} note={stats ? "Connected to route DB" : "Loading dashboard data"} />
     </div>
+    {statsError && <div role="alert" className="form-alert">Could not load dashboard statistics: {statsError}</div>}
     <div className="dashboard-lower">
       <section className="content-card overview-card">
-        <div className="card-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>Dashboard overview</h2></div><span className="live-badge"><i /> LOCAL DEMO</span></div>
+        <div className="card-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>Dashboard overview</h2></div><span className="live-badge"><i /> LIVE DATA</span></div>
         <div className="overview-graphic"><div className="overview-orbit overview-orbit-one" /><div className="overview-orbit overview-orbit-two" /><div className="overview-center"><BusFront size={27} /><span>DTC</span></div><div className="orbit-node node-one"><Users size={15} /></div><div className="orbit-node node-two"><Map size={15} /></div><div className="orbit-node node-three"><Activity size={15} /></div><span className="orbit-label label-users">PEOPLE</span><span className="orbit-label label-routes">NETWORK</span><span className="orbit-label label-ops">OPERATIONS</span></div>
         <div className="overview-caption"><span>Administration workspace</span><span>03 / 04</span></div>
       </section>

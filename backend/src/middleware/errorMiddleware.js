@@ -1,6 +1,12 @@
 export function errorHandler(err, req, res, next) {
   console.error("Backend Error:", err);
 
+  if (err.code === "P2002") {
+    return res.status(409).json({ success: false, error: "A record with that email already exists." });
+  }
+  if (err.code === "P2025") {
+    return res.status(404).json({ success: false, error: "The requested record was not found." });
+  }
   // Sequelize Unique Constraint Error (e.g. duplicate busNumber or registrationNumber)
   if (err.name === "SequelizeUniqueConstraintError") {
     const field = err.errors?.[0]?.path || "field";

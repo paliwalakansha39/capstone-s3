@@ -6,8 +6,18 @@ import { errorHandler, notFoundHandler } from "./middleware/errorMiddleware.js";
 export function createApp() {
   const app = express();
 
-  // Cross-origin resource sharing
-  app.use(cors());
+  const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      const error = new Error("Origin is not allowed by CORS.");
+      error.status = 403;
+      return callback(error);
+    }
+  }));
 
   // Body parsers
   app.use(express.json());
