@@ -3,6 +3,7 @@ import Bus from "./Bus.js";
 import Route from "./Route.js";
 import Driver from "./Driver.js";
 import Crew from "./Crew.js";
+import Trip from "./Trip.js";
 
 // Establish relationships
 // A Bus optionally belongs to a Route
@@ -27,12 +28,36 @@ Driver.hasMany(Bus, {
   as: "buses"
 });
 
+// Trip associations
+// A Route can have multiple Trips
+Route.hasMany(Trip, {
+  foreignKey: "routeId",
+  as: "trips"
+});
+
+Trip.belongsTo(Route, {
+  foreignKey: "routeId",
+  as: "route"
+});
+
+// A Bus can have multiple Trips
+Bus.hasMany(Trip, {
+  foreignKey: "busId",
+  as: "trips"
+});
+
+Trip.belongsTo(Bus, {
+  foreignKey: "busId",
+  as: "bus"
+});
+
 export {
   sequelize,
   Bus,
   Route,
   Driver,
-  Crew
+  Crew,
+  Trip
 };
 
 export default {
@@ -40,5 +65,6 @@ export default {
   Bus,
   Route,
   Driver,
-  Crew
+  Crew,
+  Trip
 };
