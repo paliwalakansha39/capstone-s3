@@ -151,6 +151,9 @@ export async function updateRoute(req, res, next) {
     const input = req.body || {};
     const errors = validateRoute(input, { partial: true });
     if (errors.length) return res.status(400).json({ success: false, error: errors[0], errors });
+    if (!Object.keys(normalizedRoute(input)).length && input.stops === undefined) {
+      return res.status(400).json({ success: false, error: "At least one route field or stops array must be provided." });
+    }
 
     const route = await prisma.$transaction(async (transaction) => {
       const current = await transaction.route.findUnique({
@@ -168,12 +171,6 @@ export async function updateRoute(req, res, next) {
           error.statusCode = 400;
           throw error;
         }
-        if (!Object.keys(changes).length && input.stops === undefined) {
-          const error = new Error("At least one route field or stops array must be provided.");
-          error.statusCode = 400;
-          throw error;
-        }
-
         await transaction.busStop.deleteMany({ where: { routeId: current.id, id: { notIn: [...submitted] } } });
         for (const [index, stop] of current.stops.entries()) {
           if (submitted.has(stop.id)) {
