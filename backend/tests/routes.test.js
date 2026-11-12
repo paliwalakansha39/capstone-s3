@@ -119,7 +119,7 @@ describe("Route and bus stop management API validation", () => {
     assert.equal(response.status, 400);
   });
 
-  it("creates, reads, updates, and deletes routes and their stops", async () => {
+  it("creates, reads, updates, and deletes routes and their stops", { skip: !process.env.DATABASE_URL }, async () => {
     const createResponse = await request("/routes", {
       method: "POST",
       body: JSON.stringify({

@@ -6,6 +6,7 @@ A comprehensive public transit operations and fleet management platform for Delh
 - **Chunk 1 — Core Portal & User Management (Member 1)**: DTC landing page, JWT administrator authentication, protected dashboard, profile management, and PostgreSQL-backed user management.
 - **Chunk 2 — Bus Management System (Member 2)**: Fullstack fleet management featuring Bus database models, database migrations, RESTful APIs, and responsive admin UI with complete CRUD operations, search, filters, modal inspector, and validation.
 - **Chunk 3 — Crew Management System (Member 3)**: Fullstack crew roster and duty availability platform featuring Crew database models, qualifications storage, availability validation middleware, RESTful APIs, and responsive admin UI with live availability KPI cards, role filtering (Drivers vs. Conductors), and modal inspector.
+- **Chunk 5 — Trip Management (Member 5)**: Fullstack bus trip scheduling and operations platform featuring Trip database models, Route and Bus Sequelize associations, SQLite migrations and indexes, time and bus conflict validation middleware, RESTful CRUD APIs with bus availability checking, and responsive admin UI with trip schedule table, statistics cards, route/date/status filters, trip creation and editing forms, and automated integration tests.
 - **Route Management**: PostgreSQL-backed routes and ordered bus stops with interactive OpenStreetMap display.
 - **Future Chunks**: Duty Scheduling.
 
@@ -77,6 +78,16 @@ Send `Authorization: Bearer <token>` for protected API requests. The browser cle
 - `POST /api/crew` — Register a new driver or conductor (with license & badge validation)
 - `PUT /api/crew/:id` — Update crew details or duty status
 - `DELETE /api/crew/:id` — Safely remove crew member (blocks deletion of active on-duty personnel)
+
+## Trip Management API Endpoints
+- `GET /api/trips` — List all trips (supports search, status/route/bus/date filters, pagination)
+- `GET /api/trips/stats` — Real-time trip statistics (total, scheduled, completed, cancelled)
+- `GET /api/trips/bus-availability` — Check if a bus is available for a specified date and time window
+- `GET /api/trips/available-buses` — List all active buses available for a given departure/arrival slot
+- `GET /api/trips/:id` — Retrieve trip details including populated Route and Bus models
+- `POST /api/trips` — Schedule a new trip with validation and bus conflict prevention (Admin only)
+- `PUT /api/trips/:id` — Update trip details, schedule, or status with conflict checking (Admin only)
+- `DELETE /api/trips/:id` — Safely remove scheduled trip (Admin only)
 
 ## Route and Bus Stop Management
 
