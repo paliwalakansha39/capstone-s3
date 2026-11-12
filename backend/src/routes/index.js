@@ -1,6 +1,7 @@
 import { Router } from "express";
 import busRoutes from "./busRoutes.js";
 import crewRoutes from "./crewRoutes.js";
+import tripRoutes from "./tripRoutes.js";
 import { getLegacyRoutes, getAllDrivers } from "../controllers/auxController.js";
 import authRoutes from "./authRoutes.js";
 import userRoutes from "./userRoutes.js";
@@ -25,6 +26,7 @@ apiRouter.use("/users", userRoutes);
 apiRouter.use("/dashboard", dashboardRoutes);
 apiRouter.use("/buses", busRoutes);
 apiRouter.use("/crew", crewRoutes);
+apiRouter.use("/trips", tripRoutes);
 apiRouter.use("/routes", routeRoutes);
 apiRouter.use("/stops", stopRoutes);
 apiRouter.get("/legacy-routes", getLegacyRoutes);
