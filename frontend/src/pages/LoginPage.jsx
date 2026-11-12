@@ -45,7 +45,7 @@ export default function LoginPage({ admin, login, loading }) {
           {error && <div role="alert" className="form-alert">{error}</div>}
           <button type="submit" className="button button-primary login-submit" disabled={submitting || loading}>{submitting ? "Signing in..." : "Sign in"} <ArrowRight size={17} /></button>
         </form>
-        <div className="login-security"><LockKeyhole size={14} /><span>Demo session is stored in this browser only.</span></div>
+        <div className="login-security"><LockKeyhole size={14} /><span>Your session ends when you log out or the token expires.</span></div>
       </div>
       <span className="login-copyright">© Delhi Transport Corporation</span>
     </div>

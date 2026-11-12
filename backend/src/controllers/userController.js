@@ -15,7 +15,9 @@ function validateUser({ name, email, password, role, requirePassword = false }) 
   if (typeof role !== "string" || role.trim().length < 2 || role.trim().length > 50) {
     return "Role must be between 2 and 50 characters.";
   }
-  if ((requirePassword || password !== undefined) && (typeof password !== "string" || password.length < 12 || password.length > 72)) {
+  if ((requirePassword || password !== undefined) && (
+    typeof password !== "string" || password.length < 12 || Buffer.byteLength(password, "utf8") > 72
+  )) {
     return "Password must be between 12 and 72 characters.";
   }
   return null;

@@ -1,5 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
 import { runMigrations } from "../src/scripts/migrate.js";
@@ -8,6 +9,16 @@ import { Bus, Route, Driver } from "../src/models/index.js";
 
 let server;
 let baseUrl;
+const TEST_SECRET = "backend-tests-only-secret-key-at-least-32-chars";
+process.env.JWT_SECRET = TEST_SECRET;
+const ADMIN_TOKEN = jwt.sign({ id: "test-admin", role: "admin" }, TEST_SECRET);
+
+function authorizedFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${ADMIN_TOKEN}` }
+  });
+}
 
 before(async () => {
   await initDatabaseConnection();
@@ -38,7 +49,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 1. Health check
   it("GET /api/health should return 200 and healthy status", async () => {
-    const res = await fetch(`${baseUrl}/health`);
+    const res = await authorizedFetch(`${baseUrl}/health`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.status, "healthy");
@@ -46,7 +57,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 2. Auxiliary routes and drivers
   it("GET /api/routes should return list of available routes", async () => {
-    const res = await fetch(`${baseUrl}/routes`);
+    const res = await authorizedFetch(`${baseUrl}/routes`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -55,7 +66,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("GET /api/drivers should return list of available drivers", async () => {
-    const res = await fetch(`${baseUrl}/drivers`);
+    const res = await authorizedFetch(`${baseUrl}/drivers`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -65,7 +76,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 3. GET /api/buses
   it("GET /api/buses should return 200 and list of buses with pagination", async () => {
-    const res = await fetch(`${baseUrl}/buses`);
+    const res = await authorizedFetch(`${baseUrl}/buses`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -74,7 +85,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("GET /api/buses?search=1041 should filter buses matching search term", async () => {
-    const res = await fetch(`${baseUrl}/buses?search=1041`);
+    const res = await authorizedFetch(`${baseUrl}/buses?search=1041`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -83,7 +94,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("GET /api/buses?status=Active should return only active buses", async () => {
-    const res = await fetch(`${baseUrl}/buses?status=Active`);
+    const res = await authorizedFetch(`${baseUrl}/buses?status=Active`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -93,7 +104,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("GET /api/buses/stats should return fleet aggregate counts", async () => {
-    const res = await fetch(`${baseUrl}/buses/stats`);
+    const res = await authorizedFetch(`${baseUrl}/buses/stats`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -115,7 +126,7 @@ describe("DTC Bus Management System API Test Suite", () => {
       status: "Active"
     };
 
-    const res = await fetch(`${baseUrl}/buses`, {
+    const res = await authorizedFetch(`${baseUrl}/buses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -139,7 +150,7 @@ describe("DTC Bus Management System API Test Suite", () => {
       busType: "Electric"
     };
 
-    const res = await fetch(`${baseUrl}/buses`, {
+    const res = await authorizedFetch(`${baseUrl}/buses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -158,7 +169,7 @@ describe("DTC Bus Management System API Test Suite", () => {
       busType: "Electric"
     };
 
-    const res = await fetch(`${baseUrl}/buses`, {
+    const res = await authorizedFetch(`${baseUrl}/buses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -171,7 +182,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("POST /api/buses should reject missing required fields with 400", async () => {
-    const res = await fetch(`${baseUrl}/buses`, {
+    const res = await authorizedFetch(`${baseUrl}/buses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ busNumber: "" })
@@ -183,7 +194,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("POST /api/buses should reject invalid capacity with 400", async () => {
-    const res = await fetch(`${baseUrl}/buses`, {
+    const res = await authorizedFetch(`${baseUrl}/buses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -200,7 +211,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 6. GET /api/buses/:id
   it("GET /api/buses/:id should return created bus details", async () => {
-    const res = await fetch(`${baseUrl}/buses/${createdBusId}`);
+    const res = await authorizedFetch(`${baseUrl}/buses/${createdBusId}`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -209,7 +220,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("GET /api/buses/:id should return 404 for nonexistent bus ID", async () => {
-    const res = await fetch(`${baseUrl}/buses/00000000-0000-0000-0000-000000000000`);
+    const res = await authorizedFetch(`${baseUrl}/buses/00000000-0000-0000-0000-000000000000`);
     assert.equal(res.status, 404);
     const body = await res.json();
     assert.equal(body.success, false);
@@ -217,7 +228,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 7. PUT /api/buses/:id (Update)
   it("PUT /api/buses/:id should update bus details successfully", async () => {
-    const res = await fetch(`${baseUrl}/buses/${createdBusId}`, {
+    const res = await authorizedFetch(`${baseUrl}/buses/${createdBusId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -236,7 +247,7 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   it("PUT /api/buses/:id should return 404 when updating nonexistent bus", async () => {
-    const res = await fetch(`${baseUrl}/buses/00000000-0000-0000-0000-000000000000`, {
+    const res = await authorizedFetch(`${baseUrl}/buses/00000000-0000-0000-0000-000000000000`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Active" })
@@ -249,7 +260,7 @@ describe("DTC Bus Management System API Test Suite", () => {
 
   // 8. DELETE /api/buses/:id (Delete)
   it("DELETE /api/buses/:id should delete bus and return 200", async () => {
-    const res = await fetch(`${baseUrl}/buses/${createdBusId}`, {
+    const res = await authorizedFetch(`${baseUrl}/buses/${createdBusId}`, {
       method: "DELETE"
     });
 
@@ -259,12 +270,12 @@ describe("DTC Bus Management System API Test Suite", () => {
     assert.match(body.message, /deleted/i);
 
     // Verify it is no longer found
-    const getRes = await fetch(`${baseUrl}/buses/${createdBusId}`);
+    const getRes = await authorizedFetch(`${baseUrl}/buses/${createdBusId}`);
     assert.equal(getRes.status, 404);
   });
 
   it("DELETE /api/buses/:id should return 404 for already deleted bus", async () => {
-    const res = await fetch(`${baseUrl}/buses/${createdBusId}`, {
+    const res = await authorizedFetch(`${baseUrl}/buses/${createdBusId}`, {
       method: "DELETE"
     });
 

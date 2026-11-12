@@ -1,7 +1,8 @@
 import api from "./api";
 
 export async function getCrew(params = {}) {
-  const response = await api.get("/crew", { params });
+  const filters = Object.fromEntries(Object.entries(params).filter(([, value]) => value && value !== "all"));
+  const response = await api.get("/crew", { params: filters });
   return response.data;
 }
 

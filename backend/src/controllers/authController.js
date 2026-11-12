@@ -28,7 +28,7 @@ function setupKeyMatches(received) {
 function validCredentials({ name, email, password }) {
   return typeof name === "string" && name.trim().length >= 2 && name.trim().length <= 100
     && typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-    && typeof password === "string" && password.length >= 12 && password.length <= 72;
+    && typeof password === "string" && password.length >= 12 && Buffer.byteLength(password, "utf8") <= 72;
 }
 
 export async function registerAdmin(req, res, next) {

@@ -1,6 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Op } from "sequelize";
+import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
 import { runMigrations } from "../src/scripts/migrate.js";
@@ -9,6 +10,16 @@ import { Crew } from "../src/models/index.js";
 
 let server;
 let baseUrl;
+const TEST_SECRET = "backend-tests-only-secret-key-at-least-32-chars";
+process.env.JWT_SECRET = TEST_SECRET;
+const ADMIN_TOKEN = jwt.sign({ id: "test-admin", role: "admin" }, TEST_SECRET);
+
+function authorizedFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${ADMIN_TOKEN}` }
+  });
+}
 
 before(async () => {
   await initDatabaseConnection();
@@ -52,7 +63,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 1. Crew listing and pagination
   it("GET /api/crew should return 200 and list of crew members with pagination", async () => {
-    const res = await fetch(`${baseUrl}/crew`);
+    const res = await authorizedFetch(`${baseUrl}/crew`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -64,7 +75,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 2. Filter by role
   it("GET /api/crew?role=Driver should return only drivers", async () => {
-    const res = await fetch(`${baseUrl}/crew?role=Driver`);
+    const res = await authorizedFetch(`${baseUrl}/crew?role=Driver`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -72,7 +83,7 @@ describe("DTC Crew Management System API Test Suite", () => {
   });
 
   it("GET /api/crew?role=Conductor should return only conductors", async () => {
-    const res = await fetch(`${baseUrl}/crew?role=Conductor`);
+    const res = await authorizedFetch(`${baseUrl}/crew?role=Conductor`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -81,7 +92,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 3. Availability stats
   it("GET /api/crew/availability should return real-time crew availability metrics", async () => {
-    const res = await fetch(`${baseUrl}/crew/availability`);
+    const res = await authorizedFetch(`${baseUrl}/crew/availability`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -106,7 +117,7 @@ describe("DTC Crew Management System API Test Suite", () => {
       phone: "+91 98110 01122"
     };
 
-    const res = await fetch(`${baseUrl}/crew`, {
+    const res = await authorizedFetch(`${baseUrl}/crew`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -135,7 +146,7 @@ describe("DTC Crew Management System API Test Suite", () => {
       phone: "+91 98711 00223"
     };
 
-    const res = await fetch(`${baseUrl}/crew`, {
+    const res = await authorizedFetch(`${baseUrl}/crew`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -159,7 +170,7 @@ describe("DTC Crew Management System API Test Suite", () => {
       assignedDepot: "BBM Depot"
     };
 
-    const res = await fetch(`${baseUrl}/crew`, {
+    const res = await authorizedFetch(`${baseUrl}/crew`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -182,7 +193,7 @@ describe("DTC Crew Management System API Test Suite", () => {
       assignedDepot: "BBM Depot"
     };
 
-    const res = await fetch(`${baseUrl}/crew`, {
+    const res = await authorizedFetch(`${baseUrl}/crew`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -195,7 +206,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 8. GET /api/crew/:id
   it("GET /api/crew/:id should return crew details by ID", async () => {
-    const res = await fetch(`${baseUrl}/crew/${createdDriverId}`);
+    const res = await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -205,7 +216,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 9. PUT /api/crew/:id
   it("PUT /api/crew/:id should update status to On Duty", async () => {
-    const res = await fetch(`${baseUrl}/crew/${createdDriverId}`, {
+    const res = await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "On Duty", assignedDepot: "Rohini Depot-I" })
@@ -220,7 +231,7 @@ describe("DTC Crew Management System API Test Suite", () => {
 
   // 10. DELETE safety check - block deletion of On Duty crew
   it("DELETE /api/crew/:id should reject deletion of an 'On Duty' crew member", async () => {
-    const res = await fetch(`${baseUrl}/crew/${createdDriverId}`, {
+    const res = await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`, {
       method: "DELETE"
     });
 
@@ -233,13 +244,13 @@ describe("DTC Crew Management System API Test Suite", () => {
   // 11. DELETE when status is changed to Available
   it("DELETE /api/crew/:id should successfully delete crew member once relieved", async () => {
     // Relieve to Available
-    await fetch(`${baseUrl}/crew/${createdDriverId}`, {
+    await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Available" })
     });
 
-    const res = await fetch(`${baseUrl}/crew/${createdDriverId}`, {
+    const res = await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`, {
       method: "DELETE"
     });
 
@@ -248,7 +259,7 @@ describe("DTC Crew Management System API Test Suite", () => {
     assert.equal(body.success, true);
 
     // Verify deletion
-    const verifyRes = await fetch(`${baseUrl}/crew/${createdDriverId}`);
+    const verifyRes = await authorizedFetch(`${baseUrl}/crew/${createdDriverId}`);
     assert.equal(verifyRes.status, 404);
   });
 

@@ -13,9 +13,6 @@
     "seed:admin": "node prisma/seed.js",
     "test": "node --test tests/*.test.js"
   },
-  "prisma": {
-    "schema": "prisma/schema.prisma"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.0",
     "bcrypt": "^5.1.1",

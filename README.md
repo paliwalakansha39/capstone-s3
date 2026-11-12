@@ -34,7 +34,7 @@ npm run seed:admin
 npm run dev
 ```
 
-Before starting, copy `.env.example` to `.env` and set `DATABASE_URL`, a random `JWT_SECRET` of at least 32 characters, `ADMIN_SETUP_KEY`, and the seed administrator's name, email, and strong password. Create the PostgreSQL database named in `DATABASE_URL` first. The Prisma migration creates the PostgreSQL `admins` and `users` tables; the existing migration and seed commands initialize the SQLite bus/crew database. The seed administrator password is hashed with bcrypt before storage.
+Before starting, copy `.env.example` to `.env` only if you do not already have a `.env`; otherwise merge the example variables into your existing file without overwriting it. Set `DATABASE_URL`, a random `JWT_SECRET` of at least 32 characters, `ADMIN_SETUP_KEY`, and the seed administrator's name, email, and strong password. Create the PostgreSQL database named in `DATABASE_URL` first. The Prisma migration creates the PostgreSQL `admins` and `users` tables; the existing migration and seed commands initialize the SQLite bus/crew database. The seed administrator password is hashed with bcrypt before storage.
 
 Backend runs on `http://localhost:5001`. Keep `.env` private and never commit it.
 
