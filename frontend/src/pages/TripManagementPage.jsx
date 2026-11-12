@@ -21,15 +21,33 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
 import {
+  createTrip,
   deleteTrip,
+  getBuses,
   getRoutes,
   getTrips,
-  getTripStats
+  getTripStats,
+  updateTrip
 } from "../services/tripService";
+
+const INITIAL_FORM = {
+  routeId: "",
+  busId: "",
+  tripDate: new Date().toISOString().slice(0, 10),
+  departureTime: "08:00",
+  arrivalTime: "09:30",
+  startingStop: "",
+  destinationStop: "",
+  status: "Scheduled",
+  isOvernight: false
+};
+
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export default function TripManagementPage() {
   const [trips, setTrips] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [buses, setBuses] = useState([]);
   const [stats, setStats] = useState(null);
 
   // Filters & Search
@@ -42,7 +60,15 @@ export default function TripManagementPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  // Modals state
+  // Modal states: 'add' | 'edit' | null
+  const [modalMode, setModalMode] = useState(null);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formModalError, setFormModalError] = useState("");
+
+  // View details & delete modals
   const [viewTrip, setViewTrip] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -51,18 +77,24 @@ export default function TripManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
-  // Load auxiliary routes data for filter
+  // Load auxiliary routes and buses from DB on mount
   useEffect(() => {
     let mounted = true;
-    async function loadAuxRoutes() {
+    async function loadAuxData() {
       try {
-        const routeList = await getRoutes();
-        if (mounted) setRoutes(routeList || []);
+        const [routeList, busList] = await Promise.all([
+          getRoutes(),
+          getBuses()
+        ]);
+        if (mounted) {
+          setRoutes(routeList || []);
+          setBuses(busList || []);
+        }
       } catch (err) {
-        console.warn("Could not load route helper options:", err.message);
+        console.warn("Could not load routes or buses helper options:", err.message);
       }
     }
-    loadAuxRoutes();
+    loadAuxData();
     return () => {
       mounted = false;
     };
@@ -123,6 +155,171 @@ export default function TripManagementPage() {
     }
   }
 
+  // Open creation modal
+  function handleOpenAdd() {
+    setError("");
+    setNotice("");
+    setFormModalError("");
+    setFormErrors({});
+    setActiveTrip(null);
+    setForm({
+      ...INITIAL_FORM,
+      tripDate: new Date().toISOString().slice(0, 10),
+      routeId: routes[0]?.id || "",
+      startingStop: routes[0]?.startPoint || "",
+      destinationStop: routes[0]?.endPoint || "",
+      busId: buses.find((b) => b.status === "Active")?.id || ""
+    });
+    setModalMode("add");
+  }
+
+  // Open edit modal
+  function handleOpenEdit(trip) {
+    setError("");
+    setNotice("");
+    setFormModalError("");
+    setFormErrors({});
+    setActiveTrip(trip);
+
+    const depParts = (trip.departureTime || "08:00").slice(0, 5);
+    const arrParts = (trip.arrivalTime || "09:30").slice(0, 5);
+
+    setForm({
+      routeId: trip.routeId || trip.route?.id || "",
+      busId: trip.busId || trip.bus?.id || "",
+      tripDate: trip.tripDate || new Date().toISOString().slice(0, 10),
+      departureTime: depParts,
+      arrivalTime: arrParts,
+      startingStop: trip.startingStop || "",
+      destinationStop: trip.destinationStop || "",
+      status: trip.status || "Scheduled",
+      isOvernight: arrParts <= depParts
+    });
+    setModalMode("edit");
+  }
+
+  function handleCloseModal() {
+    setModalMode(null);
+    setActiveTrip(null);
+    setFormErrors({});
+    setFormModalError("");
+  }
+
+  // Handle route change with automatic stop population
+  function handleRouteChange(selectedRouteId) {
+    const selectedRoute = routes.find((r) => r.id === selectedRouteId);
+    setForm((prev) => ({
+      ...prev,
+      routeId: selectedRouteId,
+      startingStop: selectedRoute ? selectedRoute.startPoint : prev.startingStop,
+      destinationStop: selectedRoute ? selectedRoute.endPoint : prev.destinationStop
+    }));
+    if (formErrors.routeId) {
+      setFormErrors((prev) => ({ ...prev, routeId: null }));
+    }
+  }
+
+  // Frontend validation
+  function validateForm() {
+    const errors = {};
+
+    if (!form.routeId) {
+      errors.routeId = "Please select a route.";
+    }
+
+    if (!form.busId) {
+      errors.busId = "Please select a bus.";
+    }
+
+    if (!form.tripDate) {
+      errors.tripDate = "Trip date is required.";
+    }
+
+    if (!form.departureTime || !TIME_REGEX.test(form.departureTime.trim())) {
+      errors.departureTime = "Valid departure time (HH:mm) is required.";
+    }
+
+    if (!form.arrivalTime || !TIME_REGEX.test(form.arrivalTime.trim())) {
+      errors.arrivalTime = "Valid arrival time (HH:mm) is required.";
+    }
+
+    if (
+      form.departureTime &&
+      form.arrivalTime &&
+      TIME_REGEX.test(form.departureTime.trim()) &&
+      TIME_REGEX.test(form.arrivalTime.trim())
+    ) {
+      const [depH, depM] = form.departureTime.trim().split(":").map(Number);
+      const [arrH, arrM] = form.arrivalTime.trim().split(":").map(Number);
+      const depMinutes = depH * 60 + depM;
+      const arrMinutes = arrH * 60 + arrM;
+
+      if (depMinutes === arrMinutes) {
+        errors.arrivalTime = "Arrival time cannot be identical to departure time.";
+      } else if (arrMinutes < depMinutes && !form.isOvernight) {
+        errors.arrivalTime = "Arrival time is earlier than departure. Check 'Overnight trip' if this trip arrives next day.";
+      }
+    }
+
+    if (!form.startingStop || !form.startingStop.trim()) {
+      errors.startingStop = "Starting stop is required.";
+    }
+
+    if (!form.destinationStop || !form.destinationStop.trim()) {
+      errors.destinationStop = "Destination stop is required.";
+    }
+
+    if (
+      form.startingStop &&
+      form.destinationStop &&
+      form.startingStop.trim().toLowerCase() === form.destinationStop.trim().toLowerCase()
+    ) {
+      errors.destinationStop = "Starting stop and destination stop cannot be the same.";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  // Handle Form Submit
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setFormModalError("");
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        routeId: form.routeId.trim(),
+        busId: form.busId.trim(),
+        tripDate: form.tripDate.trim(),
+        departureTime: form.departureTime.trim(),
+        arrivalTime: form.arrivalTime.trim(),
+        startingStop: form.startingStop.trim(),
+        destinationStop: form.destinationStop.trim(),
+        status: form.status,
+        isOvernight: Boolean(form.isOvernight)
+      };
+
+      if (modalMode === "add") {
+        await createTrip(payload);
+        setNotice("New trip scheduled successfully in the database.");
+      } else if (modalMode === "edit") {
+        await updateTrip(activeTrip.id, payload);
+        setNotice("Trip schedule updated successfully.");
+      }
+
+      handleCloseModal();
+      await loadTripData();
+    } catch (err) {
+      setFormModalError(err.message || "Failed to save trip schedule.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Handle Delete Trip
   async function handleDeleteTrip() {
     if (!deleteTarget) return;
     setError("");
@@ -162,6 +359,14 @@ export default function TripManagementPage() {
           >
             <RefreshCw size={14} className={isLoading ? "spinner" : ""} />
             <span>Refresh</span>
+          </button>
+          <button
+            className="button button-primary"
+            onClick={handleOpenAdd}
+            aria-label="Schedule new trip"
+          >
+            <Plus size={15} />
+            <span>Schedule Trip</span>
           </button>
         </div>
       </div>
@@ -421,6 +626,14 @@ export default function TripManagementPage() {
                           <Eye size={13} />
                         </button>
                         <button
+                          className="table-btn edit-btn"
+                          onClick={() => handleOpenEdit(trip)}
+                          title="Edit trip schedule"
+                          aria-label={`Edit trip ${trip.id.slice(0, 8)}`}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
                           className="table-btn delete-btn"
                           onClick={() => setDeleteTarget(trip)}
                           title="Delete trip schedule"
@@ -465,6 +678,295 @@ export default function TripManagementPage() {
           </div>
         )}
       </div>
+
+      {/* Trip Creation & Editing Modal */}
+      {modalMode && (
+        <div className="modal-backdrop" onClick={handleCloseModal}>
+          <div
+            className="modal-box bus-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label={modalMode === "add" ? "Schedule New Trip" : "Edit Trip Schedule"}
+          >
+            <div className="modal-header">
+              <div className="table-title">
+                <div className="table-icon">
+                  <CalendarDays size={18} />
+                </div>
+                <div>
+                  <h2>{modalMode === "add" ? "Schedule New Trip" : "Edit Trip Schedule"}</h2>
+                  <span>
+                    {modalMode === "add"
+                      ? "Assign bus, route, and transit schedule"
+                      : `Modifying Trip ${activeTrip?.id?.slice(0, 8)}`}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="modal-close-btn"
+                onClick={handleCloseModal}
+                aria-label="Close dialog"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {formModalError && (
+              <div
+                className="bus-error-banner"
+                role="alert"
+                style={{ margin: "14px 0 6px 0" }}
+              >
+                <AlertCircle size={15} style={{ display: "inline", marginRight: "6px" }} />
+                {formModalError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} style={{ marginTop: "14px" }}>
+              <div className="bus-form-grid">
+                {/* Route Selection */}
+                <label className="full-span">
+                  <span>
+                    Route Selection <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <select
+                    value={form.routeId}
+                    onChange={(e) => handleRouteChange(e.target.value)}
+                    required
+                  >
+                    <option value="">Select an active DTC route...</option>
+                    {routes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Route {r.routeNumber} ({r.startPoint} ↔ {r.endPoint})
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.routeId && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.routeId}
+                    </span>
+                  )}
+                </label>
+
+                {/* Bus Selection */}
+                <label className="full-span">
+                  <span>
+                    Bus Assignment <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <select
+                    value={form.busId}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, busId: e.target.value }));
+                      if (formErrors.busId) {
+                        setFormErrors((prev) => ({ ...prev, busId: null }));
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">Select a bus for assignment...</option>
+                    {buses.map((b) => (
+                      <option
+                        key={b.id}
+                        value={b.id}
+                        disabled={b.status !== "Active"}
+                      >
+                        {b.busNumber} — {b.busType} ({b.registrationNumber}) [Status: {b.status}]
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.busId && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.busId}
+                    </span>
+                  )}
+                </label>
+
+                {/* Trip Date */}
+                <label>
+                  <span>
+                    Trip Date <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <input
+                    type="date"
+                    value={form.tripDate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tripDate: e.target.value }))}
+                    required
+                  />
+                  {formErrors.tripDate && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.tripDate}
+                    </span>
+                  )}
+                </label>
+
+                {/* Trip Status */}
+                <label>
+                  <span>
+                    Trip Status <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+                    required
+                  >
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </label>
+
+                {/* Departure Time */}
+                <label>
+                  <span>
+                    Departure Time <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <input
+                    type="time"
+                    value={form.departureTime}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, departureTime: e.target.value }))
+                    }
+                    required
+                  />
+                  {formErrors.departureTime && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.departureTime}
+                    </span>
+                  )}
+                </label>
+
+                {/* Arrival Time */}
+                <label>
+                  <span>
+                    Arrival Time <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <input
+                    type="time"
+                    value={form.arrivalTime}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, arrivalTime: e.target.value }))
+                    }
+                    required
+                  />
+                  {formErrors.arrivalTime && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.arrivalTime}
+                    </span>
+                  )}
+                </label>
+
+                {/* Overnight Trip Checkbox */}
+                <div
+                  className="full-span"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#f8fafb",
+                    padding: "8px 12px",
+                    borderRadius: "3px",
+                    border: "1px solid #edf0f2"
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id="isOvernight"
+                    checked={form.isOvernight}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, isOvernight: e.target.checked }))
+                    }
+                    style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                  />
+                  <label
+                    htmlFor="isOvernight"
+                    style={{ fontSize: "11px", color: "#334155", cursor: "pointer", fontWeight: 500 }}
+                  >
+                    Overnight journey (bus arrives on the following calendar day)
+                  </label>
+                </div>
+
+                {/* Starting Stop */}
+                <label>
+                  <span>
+                    Starting Bus Stop <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <input
+                    type="text"
+                    value={form.startingStop}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, startingStop: e.target.value }))
+                    }
+                    placeholder="e.g. Ambedkar Nagar Terminal"
+                    maxLength={120}
+                    required
+                  />
+                  {formErrors.startingStop && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.startingStop}
+                    </span>
+                  )}
+                </label>
+
+                {/* Destination Stop */}
+                <label>
+                  <span>
+                    Destination Bus Stop <strong style={{ color: "#dc2626" }}>*</strong>
+                  </span>
+                  <input
+                    type="text"
+                    value={form.destinationStop}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, destinationStop: e.target.value }))
+                    }
+                    placeholder="e.g. Old Delhi Railway Station"
+                    maxLength={120}
+                    required
+                  />
+                  {formErrors.destinationStop && (
+                    <span style={{ color: "#dc2626", fontSize: "10px" }}>
+                      {formErrors.destinationStop}
+                    </span>
+                  )}
+                </label>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                  marginTop: "20px",
+                  borderTop: "1px solid #eef2f4",
+                  paddingTop: "14px"
+                }}
+              >
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={handleCloseModal}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? modalMode === "add"
+                      ? "Scheduling..."
+                      : "Updating..."
+                    : modalMode === "add"
+                    ? "Schedule Trip"
+                    : "Update Trip"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* View Details Modal */}
       {viewTrip && (
