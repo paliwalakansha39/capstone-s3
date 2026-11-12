@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useWorkspace } from "./context/WorkspaceContext";
@@ -10,7 +11,7 @@ import ProfilePage from "./pages/ProfilePage";
 import UsersPage from "./pages/UsersPage";
 import BusManagementPage from "./pages/BusManagementPage";
 import CrewManagementPage from "./pages/CrewManagementPage";
-import RouteManagementPage from "./pages/RouteManagementPage";
+const RouteManagementPage = lazy(() => import("./pages/RouteManagementPage"));
 
 export default function App() {
   const { admin, login, logout, loading } = useAuth();
@@ -25,7 +26,7 @@ export default function App() {
       <Route path="users" element={<UsersPage />} />
       <Route path="buses" element={<BusManagementPage />} />
       <Route path="crew" element={<CrewManagementPage />} />
-      <Route path="routes" element={<RouteManagementPage />} />
+      <Route path="routes" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading route management...</main>}><RouteManagementPage /></Suspense>} />
       <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

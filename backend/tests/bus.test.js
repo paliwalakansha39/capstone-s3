@@ -56,8 +56,8 @@ describe("DTC Bus Management System API Test Suite", () => {
   });
 
   // 2. Auxiliary routes and drivers
-  it("GET /api/routes should return list of available routes", async () => {
-    const res = await authorizedFetch(`${baseUrl}/routes`);
+  it("GET /api/legacy-routes should return routes available for bus assignment", async () => {
+    const res = await authorizedFetch(`${baseUrl}/legacy-routes`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);

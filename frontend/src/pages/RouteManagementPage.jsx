@@ -58,7 +58,8 @@ function MapContent({ route }) {
       <Marker key={stop.id || `${stop.sequenceNumber}-${stop.stopName}`} position={points[index]} icon={index === 0 || index === stops.length - 1 ? terminalIcon : stopIcon}>
         <Popup>
           <strong>{stop.stopName}</strong><br />
-          Stop {stop.sequenceNumber} · {stop.latitude.toFixed(5)}, {stop.longitude.toFixed(5)}
+            {index === 0 ? `Start · ${route.startingPoint}` : index === stops.length - 1 ? `Destination · ${route.destination}` : `Stop ${stop.sequenceNumber}`}
+            <br />{stop.latitude.toFixed(5)}, {stop.longitude.toFixed(5)}
         </Popup>
       </Marker>
     ))}
