@@ -1,7 +1,7 @@
 import { Route, Driver } from "../models/index.js";
 
-// GET /api/routes
-export async function getAllRoutes(req, res, next) {
+// Legacy SQLite routes are still used by the existing bus assignment form.
+export async function getLegacyRoutes(req, res, next) {
   try {
     const routes = await Route.findAll({
       order: [["routeNumber", "ASC"]]

@@ -2,10 +2,14 @@ export function errorHandler(err, req, res, next) {
   console.error("Backend Error:", err);
 
   if (err.code === "P2002") {
-    return res.status(409).json({ success: false, error: "A record with that email already exists." });
+    const target = Array.isArray(err.meta?.target) ? err.meta.target.join(", ") : "unique field";
+    return res.status(409).json({ success: false, error: `A record with this ${target} already exists.` });
   }
   if (err.code === "P2025") {
-    return res.status(404).json({ success: false, error: "The requested record was not found." });
+    return res.status(404).json({ success: false, error: "The requested route, stop, or record was not found." });
+  }
+  if (err.code === "P2003") {
+    return res.status(400).json({ success: false, error: "The requested route relationship is invalid." });
   }
   // Sequelize Unique Constraint Error (e.g. duplicate busNumber or registrationNumber)
   if (err.name === "SequelizeUniqueConstraintError") {

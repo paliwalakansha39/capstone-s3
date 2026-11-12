@@ -32,7 +32,7 @@ export async function deleteBus(id) {
 }
 
 export async function getRoutes() {
-  const response = await api.get("/routes");
+  const response = await api.get("/legacy-routes");
   return response.data.data || [];
 }
 

@@ -161,17 +161,28 @@ export async function updateRoute(req, res, next) {
 
       const changes = normalizedRoute(input);
       if (input.stops !== undefined) {
-        const submittedIds = new Set(input.stops.filter((stop) => stop.id).map((stop) => stop.id));
+        const submitted = new Set(input.stops.filter((stop) => stop.id).map((stop) => stop.id));
         const existingIds = new Set(current.stops.map((stop) => stop.id));
-        if ([...submittedIds].some((id) => !existingIds.has(id))) {
+        if ([...submitted].some((id) => !existingIds.has(id))) {
           const error = new Error("Every stop ID must belong to this route.");
           error.statusCode = 400;
           throw error;
         }
+        if (!Object.keys(changes).length && input.stops === undefined) {
+          const error = new Error("At least one route field or stops array must be provided.");
+          error.statusCode = 400;
+          throw error;
+        }
 
-        await transaction.busStop.deleteMany({
-          where: { routeId: current.id, id: { notIn: [...submittedIds] } }
-        });
+        await transaction.busStop.deleteMany({ where: { routeId: current.id, id: { notIn: [...submitted] } } });
+        for (const [index, stop] of current.stops.entries()) {
+          if (submitted.has(stop.id)) {
+            await transaction.busStop.update({
+              where: { id: stop.id },
+              data: { sequenceNumber: -(index + 1) }
+            });
+          }
+        }
         for (const stop of input.stops) {
           const stopData = normalizedStop(stop);
           if (stop.id) {

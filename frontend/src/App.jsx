@@ -10,6 +10,7 @@ import ProfilePage from "./pages/ProfilePage";
 import UsersPage from "./pages/UsersPage";
 import BusManagementPage from "./pages/BusManagementPage";
 import CrewManagementPage from "./pages/CrewManagementPage";
+import RouteManagementPage from "./pages/RouteManagementPage";
 
 export default function App() {
   const { admin, login, logout, loading } = useAuth();
@@ -24,7 +25,7 @@ export default function App() {
       <Route path="users" element={<UsersPage />} />
       <Route path="buses" element={<BusManagementPage />} />
       <Route path="crew" element={<CrewManagementPage />} />
-      <Route path="routes" element={<PlaceholderPage title="Route Management" />} />
+      <Route path="routes" element={<RouteManagementPage />} />
       <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

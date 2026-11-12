@@ -1,10 +1,12 @@
 import { Router } from "express";
 import busRoutes from "./busRoutes.js";
 import crewRoutes from "./crewRoutes.js";
-import { getAllRoutes, getAllDrivers } from "../controllers/auxController.js";
+import { getLegacyRoutes, getAllDrivers } from "../controllers/auxController.js";
 import authRoutes from "./authRoutes.js";
 import userRoutes from "./userRoutes.js";
 import dashboardRoutes from "./dashboardRoutes.js";
+import routeRoutes from "./routeRoutes.js";
+import stopRoutes from "./stopRoutes.js";
 
 const apiRouter = Router();
 
@@ -23,7 +25,9 @@ apiRouter.use("/users", userRoutes);
 apiRouter.use("/dashboard", dashboardRoutes);
 apiRouter.use("/buses", busRoutes);
 apiRouter.use("/crew", crewRoutes);
-apiRouter.get("/routes", getAllRoutes);
+apiRouter.use("/routes", routeRoutes);
+apiRouter.use("/stops", stopRoutes);
+apiRouter.get("/legacy-routes", getLegacyRoutes);
 apiRouter.get("/drivers", getAllDrivers);
 
 export default apiRouter;
