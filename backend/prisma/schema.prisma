@@ -34,18 +34,19 @@ model User {
 }
 
 model Route {
-  id                  String     @id @default(uuid())
-  routeNumber         String     @unique @db.VarChar(30)
-  routeName           String     @db.VarChar(120)
-  startingPoint       String     @db.VarChar(120)
-  destination         String     @db.VarChar(120)
+  id                  String                    @id @default(uuid())
+  routeNumber         String                    @unique @db.VarChar(30)
+  routeName           String                    @db.VarChar(120)
+  startingPoint       String                    @db.VarChar(120)
+  destination         String                    @db.VarChar(120)
   totalDistance       Float
   estimatedTravelTime Int
   stops               BusStop[]
   trips               Trip[]
   buses               Bus[]
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  overlappingSegments OverlappingRouteSegment[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
   @@map("routes")
 }
@@ -201,6 +202,8 @@ model ProposedRoute {
   createdAt           DateTime                  @default(now()) @map("created_at")
   updatedAt           DateTime                  @updatedAt @map("updated_at")
 
+  @@index([status])
+  @@index([createdByAdminId])
   @@map("proposed_routes")
 }
 
@@ -247,6 +250,7 @@ model OverlappingRouteSegment {
   analysisId          String               @map("analysis_id")
   analysis            RouteOverlapAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   existingRouteId     String?              @map("existing_route_id")
+  existingRoute       Route?               @relation(fields: [existingRouteId], references: [id], onDelete: SetNull)
   existingRouteNumber String               @map("existing_route_number") @db.VarChar(30)
   existingRouteName   String               @map("existing_route_name") @db.VarChar(120)
   overlapDistance     Float                @map("overlap_distance")
@@ -258,5 +262,6 @@ model OverlappingRouteSegment {
 
   @@index([analysisId])
   @@index([existingRouteId])
+  @@index([existingRouteNumber])
   @@map("overlapping_route_segments")
 }

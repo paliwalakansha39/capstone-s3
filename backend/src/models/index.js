@@ -11,5 +11,9 @@ export const BusStop = prisma.busStop;
 export const Driver = prisma.driver;
 export const Admin = prisma.admin;
 export const User = prisma.user;
+export const ProposedRoute = prisma.proposedRoute;
+export const ProposedRouteCoordinate = prisma.proposedRouteCoordinate;
+export const RouteOverlapAnalysis = prisma.routeOverlapAnalysis;
+export const OverlappingRouteSegment = prisma.overlappingRouteSegment;
 
 export default prisma;
