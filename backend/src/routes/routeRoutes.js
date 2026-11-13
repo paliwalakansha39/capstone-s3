@@ -19,17 +19,21 @@ import {
   listProposedRoutesHandler
 } from "../controllers/routeOverlapController.js";
 import { requireAdminAuth } from "../middleware/authMiddleware.js";
+import {
+  validateAnalyzeOverlap,
+  validateCreateProposedRoute
+} from "../middleware/routeOverlapValidationMiddleware.js";
 
 const router = Router();
 
 router.use(requireAdminAuth);
 
 // Chunk 8: Proposed Route & Overlap Analysis endpoints
-router.post("/analyze-overlap", analyzeOverlapHandler);
+router.post("/analyze-overlap", validateAnalyzeOverlap, analyzeOverlapHandler);
 router.get("/overlap-history", getOverlapHistoryHandler);
 router.get("/overlap/:id", getOverlapAnalysisHandler);
 router.get("/proposed", listProposedRoutesHandler);
-router.post("/proposed", createProposedRouteHandler);
+router.post("/proposed", validateCreateProposedRoute, createProposedRouteHandler);
 router.get("/proposed/:id", getProposedRouteHandler);
 router.delete("/proposed/:id", deleteProposedRouteHandler);
 
