@@ -340,9 +340,83 @@ export default function RouteOverlapPage() {
   const [showExistingRoutes, setShowExistingRoutes] = useState(true);
   const [selectedExistingRouteId, setSelectedExistingRouteId] = useState(null);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
-  const [toleranceMeters, setToleranceMeters] = useState(50);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  const handleAnalyzeOverlap = async () => {
+    if (proposedPoints.length < 2) {
+      setError("Please draw at least 2 points on the map before running overlap analysis.");
+      return;
+    }
+    setError("");
+    setNotice("");
+    setAnalyzing(true);
+    try {
+      const data = await analyzeRouteOverlap({
+        coordinates: proposedPoints,
+        proposedRouteName: routeName.trim() || "Proposed Route",
+        toleranceMeters: Number(toleranceMeters),
+        saveRecord: true
+      });
+      setAnalysisResult(data);
+      setNotice(`Analysis complete: ${data.overlapPercentage}% overlap detected with existing routes.`);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Failed to analyze route overlap.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleSaveProposedRoute = async () => {
+    if (proposedPoints.length < 2) {
+      setError("Please draw at least 2 points to save a proposed route.");
+      return;
+    }
+    setError("");
+    setNotice("");
+    setSavingRoute(true);
+    try {
+      const saved = await saveProposedRoute({
+        name: routeName.trim() || "Proposed Route",
+        coordinates: proposedPoints
+      });
+      setNotice(`Proposed route '${saved.name}' was saved successfully.`);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Failed to save proposed route.");
+    } finally {
+      setSavingRoute(false);
+    }
+  };
+
+  const handleOpenHistory = async () => {
+    setError("");
+    try {
+      const history = await getOverlapHistory();
+      setHistoryList(history || []);
+      setHistoryOpen(true);
+    } catch (err) {
+      setError("Failed to load overlap analysis history.");
+    }
+  };
+
+  const handleSelectHistoryItem = (item) => {
+    setAnalysisResult({
+      toleranceMeters: item.toleranceMeters,
+      proposedTotalDistanceKm: item.proposedTotalDistance,
+      overlappingDistanceKm: item.overlappingDistance,
+      overlapPercentage: item.overlapPercentage,
+      affectedRoutes: [],
+      overlappingSegments: item.overlappingSegments || [],
+      overlappingPolylines: (item.overlappingSegments || []).map((s) => s.segmentCoordinates || []),
+      nonOverlappingPolylines: []
+    });
+    setRouteName(item.proposedRouteName);
+    setHistoryOpen(false);
+    setNotice(`Loaded historical analysis from ${new Date(item.createdAt).toLocaleString()}.`);
+  };
 
   // Load existing routes
   useEffect(() => {
@@ -415,9 +489,52 @@ export default function RouteOverlapPage() {
               placeholder="e.g. Kashmere Gate to Rohini Express"
             />
           </label>
+
+          <label className="toolbar-label">
+            Overlap Tolerance
+            <select
+              className="input-select"
+              value={toleranceMeters}
+              onChange={(e) => setToleranceMeters(Number(e.target.value))}
+            >
+              <option value={25}>25 meters (Strict corridor)</option>
+              <option value={50}>50 meters (Standard)</option>
+              <option value={100}>100 meters (Wide arterial)</option>
+              <option value={150}>150 meters (Buffer zone)</option>
+            </select>
+          </label>
         </div>
 
         <div className="toolbar-actions">
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={handleAnalyzeOverlap}
+            disabled={analyzing || proposedPoints.length < 2}
+          >
+            {analyzing ? <span className="spinner" /> : <Play size={15} />}
+            {analyzing ? "Analyzing Overlap..." : "Analyze Overlap"}
+          </button>
+
+          <button
+            type="button"
+            className="button button-outline"
+            onClick={handleSaveProposedRoute}
+            disabled={savingRoute || proposedPoints.length < 2}
+          >
+            {savingRoute ? <span className="spinner" /> : <Save size={15} />}
+            Save Route
+          </button>
+
+          <button
+            type="button"
+            className="button button-outline"
+            onClick={handleOpenHistory}
+          >
+            <History size={15} />
+            History
+          </button>
+
           <button
             type="button"
             className={`button ${showExistingRoutes ? "button-primary" : "button-outline"}`}
@@ -425,7 +542,7 @@ export default function RouteOverlapPage() {
             title="Toggle existing DTC network routes visibility"
           >
             <Layers size={15} />
-            {showExistingRoutes ? `Existing Routes (${existingRoutes.length})` : "Show Existing Routes"}
+            {showExistingRoutes ? `Existing Routes (${existingRoutes.length})` : "Show Routes"}
           </button>
 
           <button
@@ -444,7 +561,7 @@ export default function RouteOverlapPage() {
             disabled={proposedPoints.length === 0}
           >
             <Trash2 size={15} />
-            Clear Route
+            Clear
           </button>
         </div>
       </div>
@@ -644,6 +761,81 @@ export default function RouteOverlapPage() {
           onSelectRoute={(id) => setSelectedExistingRouteId(id)}
         />
       </div>
+
+      {/* History Modal */}
+      {historyOpen && (
+        <div className="route-modal-backdrop" onClick={() => setHistoryOpen(false)}>
+          <div className="route-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="route-modal-heading">
+              <div>
+                <span className="eyebrow">HISTORICAL RECORDS</span>
+                <h2>Overlap Analysis History</h2>
+                <p>Select a previously analyzed corridor to review its metrics and segment overlays.</p>
+              </div>
+              <button
+                type="button"
+                className="route-icon-button"
+                onClick={() => setHistoryOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="history-list" style={{ maxHeight: "400px", overflowY: "auto", padding: "16px" }}>
+              {historyList.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px", color: "#64748b" }}>
+                  <History size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+                  <p>No overlap analysis history found.</p>
+                </div>
+              ) : (
+                historyList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="history-item"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 16px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      marginBottom: "10px",
+                      cursor: "pointer",
+                      background: "#ffffff"
+                    }}
+                    onClick={() => handleSelectHistoryItem(item)}
+                  >
+                    <div>
+                      <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>
+                        {item.proposedRouteName}
+                      </strong>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                        {new Date(item.createdAt).toLocaleDateString()} &bull; Tolerance: {item.toleranceMeters}m
+                      </span>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span
+                        className={`badge-${item.overlapPercentage > 50 ? "red" : item.overlapPercentage > 20 ? "amber" : "green"}`}
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          display: "inline-block",
+                          marginBottom: "4px"
+                        }}
+                      >
+                        {item.overlapPercentage}% Overlap
+                      </span>
+                      <small style={{ display: "block", color: "#64748b" }}>
+                        {item.overlappingDistance} km / {item.proposedTotalDistance} km
+                      </small>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
