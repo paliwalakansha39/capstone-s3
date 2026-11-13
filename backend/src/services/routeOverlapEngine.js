@@ -183,3 +183,57 @@ export function calculateOverlapPercentage(overlappingDistance, totalDistance) {
   const clamped = Math.max(0.0, Math.min(100.0, ratio));
   return Math.round(clamped * 100) / 100;
 }
+
+
+/**
+ * Merges overlapping or touching 1D intervals along the proposed route.
+ * Prevents double-counting overlapping distance when multiple existing routes
+ * overlap the same physical corridor segment.
+ * 
+ * @param {Array<{globalStartDist: number, globalEndDist: number}>} intervals
+ * @returns {Array<{start: number, end: number, length: number}>}
+ */
+export function mergeOverlappingIntervals(intervals) {
+  if (!intervals || intervals.length === 0) return [];
+
+  // Normalize each interval so start <= end
+  const normalized = intervals
+    .map((item) => ({
+      start: Math.min(item.globalStartDist, item.globalEndDist),
+      end: Math.max(item.globalStartDist, item.globalEndDist)
+    }))
+    .filter((item) => item.end > item.start)
+    .sort((a, b) => a.start - b.start);
+
+  if (normalized.length === 0) return [];
+
+  const merged = [normalized[0]];
+
+  for (let i = 1; i < normalized.length; i++) {
+    const current = normalized[i];
+    const last = merged[merged.length - 1];
+
+    if (current.start <= last.end + 1.0) {
+      // Intervals overlap or touch within 1 meter
+      last.end = Math.max(last.end, current.end);
+    } else {
+      merged.push({ start: current.start, end: current.end });
+    }
+  }
+
+  return merged.map((m) => ({
+    start: m.start,
+    end: m.end,
+    length: m.end - m.start
+  }));
+}
+
+/**
+ * Calculates the total unique overlapping distance across all overlapping intervals.
+ * @param {Array<{globalStartDist: number, globalEndDist: number}>} intervals
+ * @returns {number} Distance in meters
+ */
+export function calculateUniqueOverlappingDistance(intervals) {
+  const merged = mergeOverlappingIntervals(intervals);
+  return merged.reduce((acc, curr) => acc + curr.length, 0.0);
+}
