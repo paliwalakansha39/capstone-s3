@@ -71,6 +71,16 @@ This document tracks all project contributions across the three core academic su
   - `backend/src/scripts/migrate.js`: Added `duties` and `duty_assignments` database migration synchronization with optimized composite indexes on `(shift_date, depot)`, `status`, `bus_id`, `driver_id`, and `conductor_id`.
   - `backend/src/scripts/seed.js`: Seeded realistic DTC linked duty shifts pairing active fleet buses (e.g. `DTC-1041`, `DTC-1042`, `DTC-2105`) permanently with dedicated driver-conductor crew pairs for their full shifts without mid-shift vehicle swaps.
 
+### Commit 3: Linked Duty Input Validation & Constraint Middleware (Subject: ASD)
+- **Files Created**:
+  - `backend/src/middleware/dutyValidationMiddleware.js`: Implemented validation and constraint checks enforcing:
+    - Permanent 1:1 linked crew-bus assignment throughout shift.
+    - Maximum shift duration constraint (<= 8.0 hours).
+    - Asynchronous collision detection preventing bus double-booking during overlapping intervals.
+    - Driver and conductor schedule overlap detection preventing double-booking.
+    - Role and qualification verification (rejects non-drivers as driver, non-conductors as conductor, and inactive/leave crew).
+
+
 
 
 
