@@ -220,23 +220,43 @@ model ProposedRouteCoordinate {
 }
 
 model RouteOverlapAnalysis {
-  id                    String         @id @default(uuid())
-  proposedRouteId       String?        @map("proposed_route_id")
-  proposedRoute         ProposedRoute? @relation(fields: [proposedRouteId], references: [id], onDelete: Cascade)
-  proposedRouteName     String         @map("proposed_route_name") @db.VarChar(120)
-  toleranceMeters       Float          @default(50.0) @map("tolerance_meters")
-  proposedTotalDistance Float          @map("proposed_total_distance")
-  overlappingDistance   Float          @map("overlapping_distance")
-  overlapPercentage     Float          @map("overlap_percentage")
-  status                String         @default("Completed") @db.VarChar(30)
-  summary               String?        @db.Text
-  analyzedByAdminId     String?        @map("analyzed_by_admin_id")
-  analyzedByAdmin       Admin?         @relation(fields: [analyzedByAdminId], references: [id], onDelete: SetNull)
-  createdAt             DateTime       @default(now()) @map("created_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
+  id                    String                    @id @default(uuid())
+  proposedRouteId       String?                   @map("proposed_route_id")
+  proposedRoute         ProposedRoute?            @relation(fields: [proposedRouteId], references: [id], onDelete: Cascade)
+  proposedRouteName     String                    @map("proposed_route_name") @db.VarChar(120)
+  toleranceMeters       Float                     @default(50.0) @map("tolerance_meters")
+  proposedTotalDistance Float                     @map("proposed_total_distance")
+  overlappingDistance   Float                     @map("overlapping_distance")
+  overlapPercentage     Float                     @map("overlap_percentage")
+  status                String                    @default("Completed") @db.VarChar(30)
+  summary               String?                   @db.Text
+  analyzedByAdminId     String?                   @map("analyzed_by_admin_id")
+  analyzedByAdmin       Admin?                    @relation(fields: [analyzedByAdminId], references: [id], onDelete: SetNull)
+  overlappingSegments   OverlappingRouteSegment[]
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
 
   @@index([proposedRouteId])
   @@index([analyzedByAdminId])
   @@index([createdAt])
   @@map("route_overlap_analyses")
+}
+
+model OverlappingRouteSegment {
+  id                  String               @id @default(uuid())
+  analysisId          String               @map("analysis_id")
+  analysis            RouteOverlapAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  existingRouteId     String?              @map("existing_route_id")
+  existingRouteNumber String               @map("existing_route_number") @db.VarChar(30)
+  existingRouteName   String               @map("existing_route_name") @db.VarChar(120)
+  overlapDistance     Float                @map("overlap_distance")
+  overlapPercentage   Float                @map("overlap_percentage")
+  segmentCoordinates Json                 @map("segment_coordinates")
+  startPoint          Json?                @map("start_point")
+  endPoint            Json?                @map("end_point")
+  createdAt           DateTime             @default(now()) @map("created_at")
+
+  @@index([analysisId])
+  @@index([existingRouteId])
+  @@map("overlapping_route_segments")
 }
