@@ -19,36 +19,75 @@ A comprehensive public transit operations and fleet management platform for Delh
 
 ## Getting Started
 
-### Requirements
-- Node.js 20+
-- npm
-- PostgreSQL
+### System Prerequisites
+- **Node.js**: v20+ (`node -v`)
+- **npm**: v10+ (`npm -v`)
+- **PostgreSQL**: v14+ running locally (`psql -U $(whoami) -d postgres`)
 
-### 1. Backend Setup
+---
+
+### 1. Backend Installation & Setup
+
+Open a terminal and navigate to the project directory:
+
 ```sh
 cd backend
+
+# Step 1: Install all backend dependencies (Express, Sequelize, Prisma, JWT, Bcrypt, PG)
 npm install
+
+# Step 2: Configure environment variables
+# Copy .env.example to .env (adjust DATABASE_URL with your local PostgreSQL user if needed)
+cp .env.example .env
+
+# Step 3: Create the PostgreSQL database (if not already created)
+createdb dtc_bus_management
+
+# Step 4: Generate Prisma Client & apply PostgreSQL migrations
 npm run db:generate
 npm run db:migrate
+
+# Step 5: Initialize SQLite database (Buses, Crews, Trips) and seed data
 npm run migrate
 npm run seed
 npm run seed:admin
+
+# Step 6: Start the backend server (runs on http://localhost:5001)
 npm run dev
 ```
 
-Before starting, copy `.env.example` to `.env` only if you do not already have a `.env`; otherwise merge the example variables into your existing file without overwriting it. Set `DATABASE_URL`, a random `JWT_SECRET` of at least 32 characters, `ADMIN_SETUP_KEY`, and the seed administrator's name, email, and strong password. Create the PostgreSQL database named in `DATABASE_URL` first. The Prisma migration creates the PostgreSQL `admins` and `users` tables; the existing migration and seed commands initialize the SQLite bus/crew database. The seed administrator password is hashed with bcrypt before storage.
+> **Note:** The backend operates with dual database capabilities:
+> - **PostgreSQL (via Prisma)**: Stores system administrators, users, routes, and geographic bus stops.
+> - **SQLite (via Sequelize)**: Stores bus fleet assets, crew rosters, trips, and duty schedules for zero-latency operations.
 
-The Prisma migrations also create PostgreSQL `routes` and `bus_stops` tables. Route deletion cascades to associated stops. Apply all pending PostgreSQL migrations with `npm run db:migrate`; do not run `npm run migrate` as a replacement, since that command is only for the existing SQLite bus/crew database.
+---
 
-Backend runs on `http://localhost:5001`. Keep `.env` private and never commit it.
+### 2. Frontend Installation & Setup
 
-### 2. Frontend Setup
+In a separate terminal window:
+
 ```sh
 cd frontend
+
+# Step 1: Install all frontend dependencies (React 19, Leaflet, Lucide icons, Axios)
 npm install
+
+# Step 2: Start the frontend Vite development server (runs on http://localhost:5173)
 npm run dev
 ```
-Frontend runs on `http://localhost:5173` (proxies `/api` requests to `http://localhost:5001`).
+
+The frontend runs at **`http://localhost:5173`** and automatically proxies `/api` requests to `http://localhost:5001`.
+
+---
+
+### 3. Run Automated Tests
+
+To run the complete automated test suite (59+ tests covering all modules):
+
+```sh
+cd backend
+npm test
+```
 
 Sign in using the administrator credentials set in `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. Administrator registration is not open: `POST /api/auth/register` requires the `x-admin-setup-key` header matching `ADMIN_SETUP_KEY`.
 

@@ -46,6 +46,16 @@ This document tracks all project contributions across the three core academic su
   - `frontend/src/pages/DashboardPage.jsx`: Connected live crew availability metrics and quick link to crew roster on the main admin dashboard.
   - `README.md`: Documented Chunk 3 specifications and crew management API endpoints.
 
+---
+
+## [Unreleased] - Setup & Phase 2 Preparations
+
+### Documentation & Startup Resilience
+- **Files Modified**:
+  - `README.md`: Added comprehensive, step-by-step installation and setup guide detailing prerequisites, dual-database setup (PostgreSQL + SQLite), Prisma migration steps, and automated testing instructions.
+  - `backend/src/server.js`: Added graceful database connection handling so backend services run reliably across varied development environments.
+
+
 
 
 

@@ -17,7 +17,13 @@ async function startServer() {
     console.log("Initializing database connection...");
     await initDatabaseConnection();
     await runMigrations();
-    await prisma.$connect();
+
+    try {
+      await prisma.$connect();
+      console.log("PostgreSQL connected via Prisma.");
+    } catch (prismaError) {
+      console.warn("Notice: PostgreSQL is not connected. SQLite modules (Buses, Crews, Trips, Duties) will run normally.");
+    }
 
     const app = createApp();
     const server = app.listen(PORT, () => {
