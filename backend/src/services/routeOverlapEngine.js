@@ -6,8 +6,36 @@
  */
 
 export const DEFAULT_OVERLAP_TOLERANCE_METERS = 50.0;
+export const MIN_ALLOWED_TOLERANCE_METERS = 5.0;
+export const MAX_ALLOWED_TOLERANCE_METERS = 500.0;
 export const MIN_CORRIDOR_OVERLAP_METERS = 30.0;
 export const MAX_CROSSING_ANGLE_DEGREES = 35.0;
+
+/**
+ * Normalizes and validates the overlap tolerance parameter.
+ * @param {number|string|undefined} toleranceInput
+ * @returns {number} Clamped and validated tolerance in meters
+ */
+export function resolveToleranceMeters(toleranceInput) {
+  if (toleranceInput === undefined || toleranceInput === null || toleranceInput === "") {
+    return DEFAULT_OVERLAP_TOLERANCE_METERS;
+  }
+  const parsed = Number(toleranceInput);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_OVERLAP_TOLERANCE_METERS;
+  }
+  return Math.max(MIN_ALLOWED_TOLERANCE_METERS, Math.min(MAX_ALLOWED_TOLERANCE_METERS, parsed));
+}
+
+/**
+ * Calculates adaptive sampling step based on tolerance.
+ * Ensures the sampling interval is fine enough to detect continuous overlaps.
+ * @param {number} toleranceMeters
+ * @returns {number} Sample step in meters
+ */
+export function getAdaptiveSampleStep(toleranceMeters) {
+  return Math.max(10.0, Math.min(25.0, toleranceMeters * 0.5));
+}
 
 /**
  * Validates that an array of route coordinates is well-formed.
