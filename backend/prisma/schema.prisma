@@ -8,13 +8,14 @@ datasource db {
 }
 
 model Admin {
-  id        String   @id @default(uuid())
-  name      String   @db.VarChar(100)
-  email     String   @unique @db.VarChar(254)
-  password  String   @db.VarChar(255)
-  role      String   @default("admin") @db.VarChar(50)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(uuid())
+  name           String          @db.VarChar(100)
+  email          String          @unique @db.VarChar(254)
+  password       String          @db.VarChar(255)
+  role           String          @default("admin") @db.VarChar(50)
+  proposedRoutes ProposedRoute[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@map("admins")
 }
@@ -183,4 +184,35 @@ model DutyAssignment {
   @@index([driverId])
   @@index([conductorId])
   @@map("duty_assignments")
+}
+
+model ProposedRoute {
+  id                  String                    @id @default(uuid())
+  name                String                    @db.VarChar(120)
+  description         String?                   @db.Text
+  status              String                    @default("Draft") @db.VarChar(30)
+  totalDistance       Float                     @default(0.0) @map("total_distance")
+  estimatedTravelTime Int?                      @map("estimated_travel_time")
+  createdByAdminId    String?                   @map("created_by_admin_id")
+  createdByAdmin      Admin?                    @relation(fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  coordinates         ProposedRouteCoordinate[]
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+
+  @@map("proposed_routes")
+}
+
+model ProposedRouteCoordinate {
+  id              String        @id @default(uuid())
+  proposedRouteId String        @map("proposed_route_id")
+  proposedRoute   ProposedRoute @relation(fields: [proposedRouteId], references: [id], onDelete: Cascade)
+  latitude        Float
+  longitude       Float
+  sequenceNumber  Int           @map("sequence_number")
+  name            String?       @db.VarChar(120)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@unique([proposedRouteId, sequenceNumber])
+  @@index([proposedRouteId, sequenceNumber])
+  @@map("proposed_route_coordinates")
 }
