@@ -5,7 +5,7 @@ export async function runMigrations() {
     console.log("Connecting to PostgreSQL database via Prisma...");
     await prisma.$connect();
     console.log("PostgreSQL database connection verified.");
-    console.log("Tables verified: admins, users, routes, bus_stops, drivers, buses, crews, trips, duties, duty_assignments.");
+    console.log("Tables verified: admins, users, routes, bus_stops, drivers, buses, crews, trips, duties, duty_assignments, proposed_routes, proposed_route_coordinates, route_overlap_analyses, overlapping_route_segments.");
     return true;
   } catch (error) {
     console.error("Migration/connection check failed:", error);
