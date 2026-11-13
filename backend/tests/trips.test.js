@@ -1,6 +1,5 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { Op } from "sequelize";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
@@ -27,11 +26,11 @@ before(async () => {
   await seedDatabase();
 
   // Clean up any existing test trips
-  await Trip.destroy({
+  await Trip.deleteMany({
     where: {
-      [Op.or]: [
-        { startingStop: { [Op.like]: "%TEST_STOP%" } },
-        { destinationStop: { [Op.like]: "%TEST_STOP%" } }
+      OR: [
+        { startingStop: { contains: "TEST_STOP" } },
+        { destinationStop: { contains: "TEST_STOP" } }
       ]
     }
   });
@@ -58,11 +57,11 @@ describe("DTC Trip Management System API Test Suite", () => {
   let createdTripId;
 
   it("should verify existing Route and Bus records in database for assignment", async () => {
-    sampleRoute = await Route.findOne();
+    sampleRoute = await Route.findFirst();
     assert.ok(sampleRoute, "A Route should exist in the database");
     assert.ok(sampleRoute.id, "Route must have an ID");
 
-    sampleBus = await Bus.findOne({ where: { status: "Active" } });
+    sampleBus = await Bus.findFirst({ where: { status: "Active" } });
     assert.ok(sampleBus, "An Active Bus should exist in the database");
     assert.ok(sampleBus.id, "Bus must have an ID");
   });

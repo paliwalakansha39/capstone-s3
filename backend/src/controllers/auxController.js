@@ -1,10 +1,9 @@
-import { Route, Driver } from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 
-// Legacy SQLite routes are still used by the existing bus assignment form.
 export async function getLegacyRoutes(req, res, next) {
   try {
-    const routes = await Route.findAll({
-      order: [["routeNumber", "ASC"]]
+    const routes = await prisma.route.findMany({
+      orderBy: { routeNumber: "asc" }
     });
     return res.status(200).json({
       success: true,
@@ -18,8 +17,10 @@ export async function getLegacyRoutes(req, res, next) {
 // GET /api/drivers
 export async function getAllDrivers(req, res, next) {
   try {
-    const drivers = await Driver.findAll({
-      order: [["name", "ASC"]]
+    // Returns driver roster from unified crew model
+    const drivers = await prisma.crew.findMany({
+      where: { role: "Driver" },
+      orderBy: { name: "asc" }
     });
     return res.status(200).json({
       success: true,

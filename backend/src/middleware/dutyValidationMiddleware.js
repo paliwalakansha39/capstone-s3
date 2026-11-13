@@ -1,5 +1,4 @@
-import { Op } from "sequelize";
-import { Bus, Crew, Duty, DutyAssignment } from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 
 export const VALID_SHIFT_TYPES = ["Morning", "Evening", "Full-Day", "Night"];
 export const VALID_DUTY_STATUSES = ["Scheduled", "Active", "Completed", "Cancelled"];
@@ -34,7 +33,7 @@ export function calculateShiftDurationHours(startTime, endTime) {
 /**
  * Checks whether intervals [startA, endA] and [startB, endB] overlap
  */
-function intervalsOverlap(startA, endA, startB, endB) {
+export function intervalsOverlap(startA, endA, startB, endB) {
   return Math.max(startA, startB) < Math.min(endA, endB);
 }
 
@@ -45,19 +44,19 @@ export async function findBusDutyConflict({ busId, shiftDate, startTime, endTime
   const targetStart = timeStringToMinutes(startTime);
   const targetEnd = timeStringToMinutes(endTime);
 
-  const existingAssignments = await DutyAssignment.findAll({
-    where: { busId },
-    include: [
-      {
-        model: Duty,
-        as: "duty",
-        where: {
-          shiftDate,
-          status: { [Op.in]: ["Scheduled", "Active"] },
-          ...(excludeDutyId ? { id: { [Op.ne]: excludeDutyId } } : {})
-        }
+  const existingAssignments = await prisma.dutyAssignment.findMany({
+    where: {
+      busId,
+      duty: {
+        shiftDate,
+        status: { in: ["Scheduled", "Active"] },
+        ...(excludeDutyId ? { id: { not: excludeDutyId } } : {})
       }
-    ]
+    },
+    include: {
+      duty: true,
+      bus: true
+    }
   });
 
   for (const item of existingAssignments) {
@@ -78,21 +77,18 @@ export async function findCrewDutyConflict({ crewId, shiftDate, startTime, endTi
   const targetStart = timeStringToMinutes(startTime);
   const targetEnd = timeStringToMinutes(endTime);
 
-  const existingAssignments = await DutyAssignment.findAll({
+  const existingAssignments = await prisma.dutyAssignment.findMany({
     where: {
-      [Op.or]: [{ driverId: crewId }, { conductorId: crewId }]
-    },
-    include: [
-      {
-        model: Duty,
-        as: "duty",
-        where: {
-          shiftDate,
-          status: { [Op.in]: ["Scheduled", "Active"] },
-          ...(excludeDutyId ? { id: { [Op.ne]: excludeDutyId } } : {})
-        }
+      OR: [{ driverId: crewId }, { conductorId: crewId }],
+      duty: {
+        shiftDate,
+        status: { in: ["Scheduled", "Active"] },
+        ...(excludeDutyId ? { id: { not: excludeDutyId } } : {})
       }
-    ]
+    },
+    include: {
+      duty: true
+    }
   });
 
   for (const item of existingAssignments) {
@@ -183,7 +179,7 @@ export async function validateCreateDuty(req, res, next) {
     }
 
     // Database verification: Verify Bus status
-    const bus = await Bus.findByPk(busId);
+    const bus = await prisma.bus.findUnique({ where: { id: busId } });
     if (!bus) {
       return res.status(404).json({ success: false, error: "Selected bus was not found in fleet records." });
     }
@@ -195,7 +191,7 @@ export async function validateCreateDuty(req, res, next) {
     }
 
     // Database verification: Verify Driver role
-    const driver = await Crew.findByPk(driverId);
+    const driver = await prisma.crew.findUnique({ where: { id: driverId } });
     if (!driver) {
       return res.status(404).json({ success: false, error: "Selected driver was not found in crew records." });
     }
@@ -207,7 +203,7 @@ export async function validateCreateDuty(req, res, next) {
     }
 
     // Database verification: Verify Conductor role
-    const conductor = await Crew.findByPk(conductorId);
+    const conductor = await prisma.crew.findUnique({ where: { id: conductorId } });
     if (!conductor) {
       return res.status(404).json({ success: false, error: "Selected conductor was not found in crew records." });
     }
@@ -256,7 +252,7 @@ export async function validateCreateDuty(req, res, next) {
  */
 export async function validateUpdateDuty(req, res, next) {
   try {
-    const { status, shiftType, startTime, endTime, notes } = req.body;
+    const { status, shiftType, startTime, endTime } = req.body;
     const errors = [];
 
     if (status !== undefined && !VALID_DUTY_STATUSES.includes(status)) {

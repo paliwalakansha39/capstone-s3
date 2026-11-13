@@ -1,5 +1,4 @@
-import { Op } from "sequelize";
-import { Bus, Route, Trip } from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 
 export const VALID_TRIP_STATUSES = ["Scheduled", "In Progress", "Completed", "Cancelled"];
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
@@ -59,31 +58,27 @@ export async function findBusTripConflict({
   const whereClause = {
     busId,
     status: {
-      [Op.ne]: "Cancelled"
+      not: "Cancelled"
     },
     tripDate: {
-      [Op.in]: [prevDateStr, tripDate, nextDateStr]
+      in: [prevDateStr, tripDate, nextDateStr]
     }
   };
 
   if (excludeTripId) {
-    whereClause.id = { [Op.ne]: excludeTripId };
+    whereClause.id = { not: excludeTripId };
   }
 
-  const existingTrips = await Trip.findAll({
+  const existingTrips = await prisma.trip.findMany({
     where: whereClause,
-    include: [
-      {
-        model: Route,
-        as: "route",
-        attributes: ["id", "routeNumber", "routeName"]
+    include: {
+      route: {
+        select: { id: true, routeNumber: true, routeName: true }
       },
-      {
-        model: Bus,
-        as: "bus",
-        attributes: ["id", "busNumber"]
+      bus: {
+        select: { id: true, busNumber: true }
       }
-    ]
+    }
   });
 
   for (const trip of existingTrips) {

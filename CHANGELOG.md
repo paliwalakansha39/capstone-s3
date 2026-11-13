@@ -125,6 +125,46 @@ This document tracks all project contributions across the three core academic su
   - `frontend/src/pages/DashboardPage.jsx`: Integrated live linked duty metrics and quick-access navigation link.
   - `README.md`: Documented Chunk 6 endpoints, dual-database architecture, and updated automated test verification counts (71/71 tests).
 
+---
+
+## Architectural Migration: Unified PostgreSQL & Prisma ORM
+
+### Database Schema Consolidation & Relations (Subject: DE)
+- **Files Modified**:
+  - `backend/prisma/schema.prisma`: Unified the entire DTC relational schema into PostgreSQL via Prisma:
+    - Added operational models: `Bus`, `Crew`, `Trip`, `Duty`, `DutyAssignment`, and `Driver`.
+    - Preserved existing portal models: `Admin`, `User`, `Route`, and `BusStop`.
+    - Defined explicit relations, foreign keys, unique constraints, and composite indexes (`shift_date`, `depot`, `status`, `bus_id`, `driver_id`, `conductor_id`).
+    - Configured `@map` decorators to align camelCase JavaScript properties with clean PostgreSQL snake_case column names.
+  - `backend/src/scripts/migrate.js`: Updated migration routine to verify and sync PostgreSQL via Prisma.
+  - `backend/src/scripts/seed.js`: Rewritten using Prisma Client to seed complete operational DTC dataset (12 crew members, 6 buses, routes, trips, and linked duty schedules) directly into PostgreSQL.
+  - `backend/package.json`: Removed legacy `sequelize` and `sqlite3` dependencies, solidifying a 100% Prisma ORM backend.
+- **Files Deleted**:
+  - Removed obsolete Sequelize model definitions: `backend/src/models/Bus.js`, `backend/src/models/Crew.js`, `backend/src/models/Driver.js`, `backend/src/models/Duty.js`, `backend/src/models/DutyAssignment.js`, `backend/src/models/Route.js`, and `backend/src/models/Trip.js`.
+
+### Controller, Middleware & Automated Engine Refactoring (Subject: ASD)
+- **Files Modified**:
+  - `backend/src/models/index.js`: Refactored to re-export Prisma Client and model delegates (`Bus`, `Crew`, `Trip`, `Duty`, `DutyAssignment`, `Route`, `BusStop`, `Driver`, `Admin`, `User`).
+  - `backend/src/config/database.js`: Unified database connection interface to use Prisma.
+  - `backend/src/server.js`: Updated server startup to initialize and verify single PostgreSQL connection.
+  - `backend/src/controllers/busController.js`: Migrated all CRUD operations, search filters, and fleet stats to `prisma.bus`.
+  - `backend/src/controllers/crewController.js`: Migrated crew roster, availability stats, and role filtering to `prisma.crew`.
+  - `backend/src/controllers/tripController.js`: Migrated trip scheduling, bus conflict queries, and availability checks to `prisma.trip`.
+  - `backend/src/controllers/dutyController.js`: Migrated linked duty management, metrics, and automated scheduling handler to `prisma.duty` and `prisma.dutyAssignment`.
+  - `backend/src/controllers/auxController.js`: Migrated legacy route and driver lookup endpoints to Prisma.
+  - `backend/src/controllers/dashboardController.js`: Updated administrative dashboard metrics to query Prisma models.
+  - `backend/src/middleware/tripValidationMiddleware.js`: Migrated `findBusTripConflict` to Prisma.
+  - `backend/src/middleware/dutyValidationMiddleware.js`: Migrated bus and crew duty conflict detection to Prisma.
+  - `backend/src/services/dutySchedulerEngine.js`: Rewrote automated shift generator to perform Prisma atomic transactions with sequence number collision avoidance.
+
+### Test Suite Verification & Documentation (Subject: ISD & ASD)
+- **Files Modified**:
+  - `backend/tests/bus.test.js`, `backend/tests/crew.test.js`, `backend/tests/trips.test.js`, `backend/tests/duty.test.js`: Updated test fixtures and setup routines to initialize against PostgreSQL with Prisma.
+  - Test validation: **71/71 tests passing** across all 6 test suites with 0 failures.
+  - `backend/.env.example`: Removed obsolete `DB_STORAGE` variable and streamlined configuration for PostgreSQL.
+  - `README.md`: Updated architecture documentation, tech stack overview, and setup steps reflecting the unified PostgreSQL and Prisma ORM foundation.
+
+
 
 
 

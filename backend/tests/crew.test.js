@@ -1,6 +1,5 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { Op } from "sequelize";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
@@ -27,12 +26,12 @@ before(async () => {
   await seedDatabase();
 
   // Clean up any previous test artifacts
-  await Crew.destroy({
+  await Crew.deleteMany({
     where: {
-      [Op.or]: [
-        { crewId: { [Op.like]: "DTC-TEST-%" } },
-        { crewId: { [Op.like]: "%DUP%" } },
-        { badgeNumber: { [Op.like]: "%TEST%" } }
+      OR: [
+        { crewId: { contains: "TEST" } },
+        { crewId: { contains: "DUP" } },
+        { badgeNumber: { contains: "TEST" } }
       ]
     }
   });
@@ -266,7 +265,7 @@ describe("DTC Crew Management System API Test Suite", () => {
   // Cleanup conductor
   after(async () => {
     if (createdConductorId) {
-      await Crew.destroy({ where: { id: createdConductorId } });
+      await Crew.deleteMany({ where: { id: createdConductorId } });
     }
   });
 });

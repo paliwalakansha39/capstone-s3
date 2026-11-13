@@ -6,14 +6,14 @@ A comprehensive public transit operations and fleet management platform for Delh
 - **Chunk 1 — Core Portal & User Management (Member 1)**: DTC landing page, JWT administrator authentication, protected dashboard, profile management, and PostgreSQL-backed user management.
 - **Chunk 2 — Bus Management System (Member 2)**: Fullstack fleet management featuring Bus database models, database migrations, RESTful APIs, and responsive admin UI with complete CRUD operations, search, filters, modal inspector, and validation.
 - **Chunk 3 — Crew Management System (Member 3)**: Fullstack crew roster and duty availability platform featuring Crew database models, qualifications storage, availability validation middleware, RESTful APIs, and responsive admin UI with live availability KPI cards, role filtering (Drivers vs. Conductors), and modal inspector.
-- **Chunk 5 — Trip Management (Member 5)**: Fullstack bus trip scheduling and operations platform featuring Trip database models, Route and Bus Sequelize associations, SQLite migrations and indexes, time and bus conflict validation middleware, RESTful CRUD APIs with bus availability checking, and responsive admin UI with trip schedule table, statistics cards, route/date/status filters, trip creation and editing forms, and automated integration tests.
-- **Route Management**: PostgreSQL-backed routes and ordered bus stops with interactive OpenStreetMap display.
-- **Future Chunks**: Duty Scheduling.
+- **Chunk 5 — Trip Management (Member 5)**: Fullstack bus trip scheduling and operations platform featuring Trip database models, Route and Bus associations, PostgreSQL migrations and indexes, time and bus conflict validation middleware, RESTful CRUD APIs with bus availability checking, and responsive admin UI with trip schedule table, statistics cards, route/date/status filters, trip creation and editing forms, and automated integration tests.
+- **Chunk 6 — Linked Duty Scheduling (Member 3)**: Automated and manual linked duty scheduling adhering to permanent 1:1 crew-bus binding (&le; 8.0 hr shifts, dedicated driver-conductor pairs without vehicle handover), collision-free scheduling engine, duty assignment matrix, and full lifecycle management.
+- **Route & Stop Management**: PostgreSQL-backed routes and ordered bus stops with interactive OpenStreetMap display.
 
 ## Technology Stack
-- **Frontend**: React 19, Vite, React Router DOM 7, Lucide React, Custom Responsive CSS (DTC Design System).
-- **Backend**: Node.js, Express, JWT, bcrypt, Prisma ORM, Sequelize ORM, CORS, Dotenv.
-- **Database**: PostgreSQL for administrators and users; SQLite for the existing bus and crew modules.
+- **Frontend**: React 19, Vite, React Router DOM 7, Lucide React, Leaflet, Custom Responsive CSS (DTC Design System).
+- **Backend**: Node.js, Express, JWT, bcrypt, Prisma ORM, CORS, Dotenv.
+- **Database**: Single, unified PostgreSQL database powered by Prisma ORM for all entities (Buses, Crews, Trips, Duties, Routes, Stops, Admins, Users).
 
 ---
 
@@ -33,7 +33,7 @@ Open a terminal and navigate to the project directory:
 ```sh
 cd backend
 
-# Step 1: Install all backend dependencies (Express, Sequelize, Prisma, JWT, Bcrypt, PG)
+# Step 1: Install all backend dependencies (Express, Prisma, JWT, Bcrypt, PG)
 npm install
 
 # Step 2: Configure environment variables
@@ -43,22 +43,19 @@ cp .env.example .env
 # Step 3: Create the PostgreSQL database (if not already created)
 createdb dtc_bus_management
 
-# Step 4: Generate Prisma Client & apply PostgreSQL migrations
+# Step 4: Generate Prisma Client & push schema to PostgreSQL
 npm run db:generate
-npm run db:migrate
+npx prisma db push
 
-# Step 5: Initialize SQLite database (Buses, Crews, Trips) and seed data
-npm run migrate
+# Step 5: Seed initial operational data (Buses, Crews, Routes, Trips, Duties, Admins)
 npm run seed
 npm run seed:admin
 
 # Step 6: Start the backend server (runs on http://localhost:5001)
-npm run dev
+npm start
 ```
 
-> **Note:** The backend operates with dual database capabilities:
-> - **PostgreSQL (via Prisma)**: Stores system administrators, users, routes, and geographic bus stops.
-> - **SQLite (via Sequelize)**: Stores bus fleet assets, crew rosters, trips, and duty schedules for zero-latency operations.
+> **Note:** The backend operates on a **single, unified PostgreSQL database** using **Prisma ORM**, eliminating dual-database complexity and guaranteeing referential integrity across all operational entities.
 
 ---
 
@@ -154,7 +151,7 @@ All route and stop endpoints require `Authorization: Bearer <token>` from `/api/
 | `PUT` | `/api/stops/:id` | Update a bus stop |
 | `DELETE` | `/api/stops/:id` | Delete a bus stop |
 
-Route fields are `routeNumber`, `routeName`, `startingPoint`, `destination`, `totalDistance` (km), and `estimatedTravelTime` (minutes). Stop fields are `stopName`, `latitude`, `longitude`, and positive integer `sequenceNumber`; coordinates are range-checked and sequence numbers must be unique within a route. The existing bus assignment UI continues using its original SQLite route records through `GET /api/legacy-routes`.
+Route fields are `routeNumber`, `routeName`, `startingPoint`, `destination`, `totalDistance` (km), and `estimatedTravelTime` (minutes). Stop fields are `stopName`, `latitude`, `longitude`, and positive integer `sequenceNumber`; coordinates are range-checked and sequence numbers must be unique within a route. Bus assignment workflows leverage these routes via `GET /api/legacy-routes` backed by the unified PostgreSQL database.
 
 ### Run and test
 

@@ -1,5 +1,4 @@
-import { Op } from "sequelize";
-import { Bus, Route, Trip } from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 import { findBusTripConflict } from "../middleware/tripValidationMiddleware.js";
 
 /**
@@ -23,13 +22,13 @@ export async function getAllTrips(req, res, next) {
     const where = {};
 
     if (search && search.trim()) {
-      const q = `%${search.trim()}%`;
-      where[Op.or] = [
-        { startingStop: { [Op.like]: q } },
-        { destinationStop: { [Op.like]: q } },
-        { "$route.route_number$": { [Op.like]: q } },
-        { "$route.route_name$": { [Op.like]: q } },
-        { "$bus.bus_number$": { [Op.like]: q } }
+      const q = search.trim();
+      where.OR = [
+        { startingStop: { contains: q, mode: "insensitive" } },
+        { destinationStop: { contains: q, mode: "insensitive" } },
+        { route: { routeNumber: { contains: q, mode: "insensitive" } } },
+        { route: { routeName: { contains: q, mode: "insensitive" } } },
+        { bus: { busNumber: { contains: q, mode: "insensitive" } } }
       ];
     }
 
@@ -55,29 +54,28 @@ export async function getAllTrips(req, res, next) {
 
     const validSortFields = ["tripDate", "departureTime", "arrivalTime", "status", "createdAt"];
     const sortField = validSortFields.includes(sortBy) ? sortBy : "departureTime";
-    const orderDirection = sortOrder.toUpperCase() === "DESC" ? "DESC" : "ASC";
+    const orderDirection = sortOrder.toUpperCase() === "DESC" ? "desc" : "asc";
 
-    const { count, rows: trips } = await Trip.findAndCountAll({
-      where,
-      include: [
-        {
-          model: Route,
-          as: "route",
-          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint"]
+    const [count, trips] = await Promise.all([
+      prisma.trip.count({ where }),
+      prisma.trip.findMany({
+        where,
+        include: {
+          route: {
+            select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true }
+          },
+          bus: {
+            select: { id: true, busNumber: true, registrationNumber: true, busType: true, status: true }
+          }
         },
-        {
-          model: Bus,
-          as: "bus",
-          attributes: ["id", "busNumber", "registrationNumber", "busType", "status"]
-        }
-      ],
-      order: [
-        ["tripDate", "ASC"],
-        [sortField, orderDirection]
-      ],
-      limit: limitNum,
-      offset
-    });
+        orderBy: [
+          { tripDate: "asc" },
+          { [sortField]: orderDirection }
+        ],
+        skip: offset,
+        take: limitNum
+      })
+    ]);
 
     const totalPages = Math.ceil(count / limitNum);
 
@@ -104,11 +102,13 @@ export async function getAllTrips(req, res, next) {
  */
 export async function getTripStats(req, res, next) {
   try {
-    const total = await Trip.count();
-    const scheduled = await Trip.count({ where: { status: "Scheduled" } });
-    const inProgress = await Trip.count({ where: { status: "In Progress" } });
-    const completed = await Trip.count({ where: { status: "Completed" } });
-    const cancelled = await Trip.count({ where: { status: "Cancelled" } });
+    const [total, scheduled, inProgress, completed, cancelled] = await Promise.all([
+      prisma.trip.count(),
+      prisma.trip.count({ where: { status: "Scheduled" } }),
+      prisma.trip.count({ where: { status: "In Progress" } }),
+      prisma.trip.count({ where: { status: "Completed" } }),
+      prisma.trip.count({ where: { status: "Cancelled" } })
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -144,7 +144,9 @@ export async function createTrip(req, res, next) {
     } = req.body;
 
     // 1. Verify referenced route exists
-    const route = await Route.findByPk(routeId.trim());
+    const route = await prisma.route.findUnique({
+      where: { id: routeId.trim() }
+    });
     if (!route) {
       return res.status(404).json({
         success: false,
@@ -153,7 +155,9 @@ export async function createTrip(req, res, next) {
     }
 
     // 2. Verify referenced bus exists
-    const bus = await Bus.findByPk(busId.trim());
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId.trim() }
+    });
     if (!bus) {
       return res.status(404).json({
         success: false,
@@ -161,7 +165,7 @@ export async function createTrip(req, res, next) {
       });
     }
 
-    // 3. Verify bus operational status
+    // 3. Ensure bus is operational
     if (bus.status === "Maintenance" || bus.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -169,7 +173,7 @@ export async function createTrip(req, res, next) {
       });
     }
 
-    // 4. Check for overlapping trip conflicts for this bus
+    // 4. Overlap & Conflict Detection
     const conflict = await findBusTripConflict({
       busId: bus.id,
       tripDate: tripDate.trim(),
@@ -181,49 +185,45 @@ export async function createTrip(req, res, next) {
     if (conflict) {
       return res.status(409).json({
         success: false,
-        error: `Bus '${bus.busNumber}' is already assigned to an overlapping trip (${conflict.departureTime} - ${conflict.arrivalTime}) on date ${conflict.tripDate}.`,
+        error: `Bus is already assigned to an overlapping trip (${conflict.departureTime} - ${conflict.arrivalTime}) on date ${conflict.tripDate}.`,
         conflictTrip: {
           id: conflict.id,
           tripDate: conflict.tripDate,
           departureTime: conflict.departureTime,
           arrivalTime: conflict.arrivalTime,
-          status: conflict.status
+          status: conflict.status,
+          route: conflict.route
         }
       });
     }
 
-    // 5. Create the new trip
-    const newTrip = await Trip.create({
-      routeId: route.id,
-      busId: bus.id,
-      tripDate: tripDate.trim(),
-      departureTime: departureTime.trim(),
-      arrivalTime: arrivalTime.trim(),
-      startingStop: startingStop.trim(),
-      destinationStop: destinationStop.trim(),
-      status: status.trim()
-    });
-
-    // 6. Fetch complete record with associations
-    const completeTrip = await Trip.findByPk(newTrip.id, {
-      include: [
-        {
-          model: Route,
-          as: "route",
-          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint"]
+    // 5. Create Trip Record
+    const newTrip = await prisma.trip.create({
+      data: {
+        routeId: route.id,
+        busId: bus.id,
+        tripDate: tripDate.trim(),
+        departureTime: departureTime.trim(),
+        arrivalTime: arrivalTime.trim(),
+        startingStop: startingStop.trim(),
+        destinationStop: destinationStop.trim(),
+        status,
+        isOvernight: Boolean(isOvernight)
+      },
+      include: {
+        route: {
+          select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true }
         },
-        {
-          model: Bus,
-          as: "bus",
-          attributes: ["id", "busNumber", "registrationNumber", "busType", "status"]
+        bus: {
+          select: { id: true, busNumber: true, registrationNumber: true, busType: true, status: true }
         }
-      ]
+      }
     });
 
     return res.status(201).json({
       success: true,
       message: "Trip scheduled successfully.",
-      data: completeTrip
+      data: newTrip
     });
   } catch (error) {
     next(error);
@@ -232,25 +232,22 @@ export async function createTrip(req, res, next) {
 
 /**
  * GET /api/trips/:id
- * Retrieve single trip by ID with associations
+ * Retrieve a single trip by ID with route and bus details
  */
 export async function getTripById(req, res, next) {
   try {
     const { id } = req.params;
 
-    const trip = await Trip.findByPk(id, {
-      include: [
-        {
-          model: Route,
-          as: "route",
-          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint", "totalDistanceKm"]
+    const trip = await prisma.trip.findUnique({
+      where: { id },
+      include: {
+        route: {
+          select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true, totalDistance: true }
         },
-        {
-          model: Bus,
-          as: "bus",
-          attributes: ["id", "busNumber", "registrationNumber", "busType", "capacity", "depot", "status"]
+        bus: {
+          select: { id: true, busNumber: true, registrationNumber: true, busType: true, status: true, capacity: true }
         }
-      ]
+      }
     });
 
     if (!trip) {
@@ -271,7 +268,7 @@ export async function getTripById(req, res, next) {
 
 /**
  * PUT /api/trips/:id
- * Update an existing trip schedule
+ * Update trip details, schedule, or status
  */
 export async function updateTrip(req, res, next) {
   try {
@@ -288,7 +285,7 @@ export async function updateTrip(req, res, next) {
       isOvernight
     } = req.body;
 
-    const trip = await Trip.findByPk(id);
+    const trip = await prisma.trip.findUnique({ where: { id } });
     if (!trip) {
       return res.status(404).json({
         success: false,
@@ -305,7 +302,9 @@ export async function updateTrip(req, res, next) {
 
     // Verify route if updated
     if (routeId !== undefined && targetRouteId !== trip.routeId) {
-      const route = await Route.findByPk(targetRouteId);
+      const route = await prisma.route.findUnique({
+        where: { id: targetRouteId }
+      });
       if (!route) {
         return res.status(404).json({
           success: false,
@@ -316,7 +315,9 @@ export async function updateTrip(req, res, next) {
 
     // Verify bus if updated or checked
     if (busId !== undefined && targetBusId !== trip.busId) {
-      const bus = await Bus.findByPk(targetBusId);
+      const bus = await prisma.bus.findUnique({
+        where: { id: targetBusId }
+      });
       if (!bus) {
         return res.status(404).json({
           success: false,
@@ -357,31 +358,27 @@ export async function updateTrip(req, res, next) {
       }
     }
 
-    // Update trip fields
-    if (routeId !== undefined) trip.routeId = targetRouteId;
-    if (busId !== undefined) trip.busId = targetBusId;
-    if (tripDate !== undefined) trip.tripDate = targetTripDate;
-    if (departureTime !== undefined) trip.departureTime = targetDepartureTime;
-    if (arrivalTime !== undefined) trip.arrivalTime = targetArrivalTime;
-    if (startingStop !== undefined) trip.startingStop = startingStop.trim();
-    if (destinationStop !== undefined) trip.destinationStop = destinationStop.trim();
-    if (status !== undefined) trip.status = targetStatus;
+    const updateData = {};
+    if (routeId !== undefined) updateData.routeId = targetRouteId;
+    if (busId !== undefined) updateData.busId = targetBusId;
+    if (tripDate !== undefined) updateData.tripDate = targetTripDate;
+    if (departureTime !== undefined) updateData.departureTime = targetDepartureTime;
+    if (arrivalTime !== undefined) updateData.arrivalTime = targetArrivalTime;
+    if (startingStop !== undefined) updateData.startingStop = startingStop.trim();
+    if (destinationStop !== undefined) updateData.destinationStop = destinationStop.trim();
+    if (status !== undefined) updateData.status = targetStatus;
 
-    await trip.save();
-
-    const completeTrip = await Trip.findByPk(trip.id, {
-      include: [
-        {
-          model: Route,
-          as: "route",
-          attributes: ["id", "routeNumber", "routeName", "startPoint", "endPoint"]
+    const completeTrip = await prisma.trip.update({
+      where: { id },
+      data: updateData,
+      include: {
+        route: {
+          select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true }
         },
-        {
-          model: Bus,
-          as: "bus",
-          attributes: ["id", "busNumber", "registrationNumber", "busType", "status"]
+        bus: {
+          select: { id: true, busNumber: true, registrationNumber: true, busType: true, status: true }
         }
-      ]
+      }
     });
 
     return res.status(200).json({
@@ -402,7 +399,7 @@ export async function deleteTrip(req, res, next) {
   try {
     const { id } = req.params;
 
-    const trip = await Trip.findByPk(id);
+    const trip = await prisma.trip.findUnique({ where: { id } });
     if (!trip) {
       return res.status(404).json({
         success: false,
@@ -417,7 +414,7 @@ export async function deleteTrip(req, res, next) {
       });
     }
 
-    await trip.destroy();
+    await prisma.trip.delete({ where: { id } });
 
     return res.status(200).json({
       success: true,
@@ -443,7 +440,7 @@ export async function checkBusAvailability(req, res, next) {
       });
     }
 
-    const bus = await Bus.findByPk(busId.trim());
+    const bus = await prisma.bus.findUnique({ where: { id: busId.trim() } });
     if (!bus) {
       return res.status(404).json({
         success: false,
@@ -523,15 +520,15 @@ export async function getAvailableBuses(req, res, next) {
   try {
     const { tripDate, departureTime, arrivalTime, excludeTripId, isOvernight } = req.query;
 
-    const allBuses = await Bus.findAll({
-      order: [["busNumber", "ASC"]]
+    const allBuses = await prisma.bus.findMany({
+      orderBy: { busNumber: "asc" }
     });
 
     if (!tripDate || !departureTime || !arrivalTime) {
       return res.status(200).json({
         success: true,
         data: allBuses.map((bus) => ({
-          ...bus.toJSON(),
+          ...bus,
           isAvailable: bus.status === "Active",
           unavailableReason: bus.status !== "Active" ? `Bus is in ${bus.status} status` : null
         }))
@@ -540,10 +537,9 @@ export async function getAvailableBuses(req, res, next) {
 
     const busesWithStatus = await Promise.all(
       allBuses.map(async (bus) => {
-        const busJson = bus.toJSON();
         if (bus.status !== "Active") {
           return {
-            ...busJson,
+            ...bus,
             isAvailable: false,
             unavailableReason: `Bus is in ${bus.status} status`
           };
@@ -560,7 +556,7 @@ export async function getAvailableBuses(req, res, next) {
 
         if (conflict) {
           return {
-            ...busJson,
+            ...bus,
             isAvailable: false,
             unavailableReason: `Busy with trip (${conflict.departureTime} - ${conflict.arrivalTime})`,
             conflictTrip: {
@@ -573,7 +569,7 @@ export async function getAvailableBuses(req, res, next) {
         }
 
         return {
-          ...busJson,
+          ...bus,
           isAvailable: true,
           unavailableReason: null
         };

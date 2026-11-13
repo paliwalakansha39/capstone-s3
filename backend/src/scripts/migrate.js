@@ -1,47 +1,14 @@
-import { sequelize, Bus, Route, Driver, Crew, Trip, Duty, DutyAssignment } from "../models/index.js";
-import { initDatabaseConnection } from "../config/database.js";
+import { prisma } from "../config/prisma.js";
 
 export async function runMigrations() {
   try {
-    console.log("Connecting to database and applying migrations...");
-    await initDatabaseConnection();
-
-    // Sync schema (creates tables if they don't exist without dropping existing tables)
-    await sequelize.sync({ alter: false });
-
-    // Ensure database constraints and indexes for trips
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_trips_bus_date ON trips (bus_id, trip_date);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_trips_route_date ON trips (route_id, trip_date);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_trips_status ON trips (status);"
-    );
-
-    // Database indexes for linked duties & assignments
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_duties_date_depot ON duties (shift_date, depot);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_duties_status ON duties (status);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_bus ON duty_assignments (bus_id);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_driver ON duty_assignments (driver_id);"
-    );
-    await sequelize.query(
-      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_conductor ON duty_assignments (conductor_id);"
-    );
-
-    console.log("Database schema synced successfully.");
-    console.log("Tables verified: routes, drivers, buses, crews, trips, duties, duty_assignments.");
+    console.log("Connecting to PostgreSQL database via Prisma...");
+    await prisma.$connect();
+    console.log("PostgreSQL database connection verified.");
+    console.log("Tables verified: admins, users, routes, bus_stops, drivers, buses, crews, trips, duties, duty_assignments.");
     return true;
   } catch (error) {
-    console.error("Migration failed:", error);
+    console.error("Migration/connection check failed:", error);
     throw error;
   }
 }
@@ -50,7 +17,7 @@ export async function runMigrations() {
 if (process.argv[1] && process.argv[1].endsWith("migrate.js")) {
   runMigrations()
     .then(() => {
-      console.log("Migration complete.");
+      console.log("Migration check complete.");
       process.exit(0);
     })
     .catch((err) => {

@@ -1,13 +1,4 @@
-import { Op } from "sequelize";
-import {
-  sequelize,
-  Bus,
-  Crew,
-  Duty,
-  DutyAssignment,
-  Trip,
-  Route
-} from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 import {
   calculateShiftDurationHours,
   findBusDutyConflict,
@@ -54,28 +45,26 @@ function determineShiftType(startTime, endTime) {
  */
 export async function generateLinkedDuties({ shiftDate, depot = null, adminId = null }) {
   try {
-    // 1. Fetch scheduled trips on target date
     const tripWhere = {
       tripDate: shiftDate,
-      status: { [Op.in]: ["Scheduled", "In Progress"] }
+      status: { in: ["Scheduled", "In Progress"] }
     };
 
-    const trips = await Trip.findAll({
+    if (depot) {
+      tripWhere.bus = { depot };
+    }
+
+    const trips = await prisma.trip.findMany({
       where: tripWhere,
-      include: [
-        {
-          model: Bus,
-          as: "bus",
-          where: depot ? { depot } : {},
-          attributes: ["id", "busNumber", "registrationNumber", "depot", "status"]
+      include: {
+        bus: {
+          select: { id: true, busNumber: true, registrationNumber: true, depot: true, status: true }
         },
-        {
-          model: Route,
-          as: "route",
-          attributes: ["id", "routeNumber", "routeName"]
+        route: {
+          select: { id: true, routeNumber: true, routeName: true }
         }
-      ],
-      order: [["departureTime", "ASC"]]
+      },
+      orderBy: { departureTime: "asc" }
     });
 
     if (trips.length === 0) {
@@ -87,7 +76,7 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       };
     }
 
-    // 2. Group trips by busId
+    // Group trips by busId
     const busTripMap = new Map();
     for (const trip of trips) {
       if (!busTripMap.has(trip.busId)) {
@@ -99,20 +88,20 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       busTripMap.get(trip.busId).trips.push(trip);
     }
 
-    // 3. Fetch candidate crew pool (Available or off-duty, not On Leave)
+    // Fetch candidate crew pool
     const crewWhere = {
-      status: { [Op.ne]: "On Leave" },
+      status: { not: "On Leave" },
       ...(depot ? { assignedDepot: depot } : {})
     };
 
-    const allDrivers = await Crew.findAll({
+    const allDrivers = await prisma.crew.findMany({
       where: { ...crewWhere, role: "Driver" },
-      order: [["experienceYears", "DESC"]]
+      orderBy: { experienceYears: "desc" }
     });
 
-    const allConductors = await Crew.findAll({
+    const allConductors = await prisma.crew.findMany({
       where: { ...crewWhere, role: "Conductor" },
-      order: [["experienceYears", "DESC"]]
+      orderBy: { experienceYears: "desc" }
     });
 
     const assignedDriverIds = new Set();
@@ -122,27 +111,29 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
 
     let dutySequence = 1;
 
-    // 4. Process each bus and form linked duties
+    // Process each bus and form linked duties
     for (const [busId, { bus, trips: busTrips }] of busTripMap.entries()) {
       if (bus.status === "Maintenance" || bus.status === "Inactive") {
         warnings.push(`Skipped Bus ${bus.busNumber}: Fleet status is '${bus.status}'.`);
         continue;
       }
 
-      // Earliest departure and latest arrival
       const earliestDeparture = busTrips[0].departureTime;
       const latestArrival = busTrips[busTrips.length - 1].arrivalTime;
 
-      // Add 20-min buffer before start and 15-min post-duty buffer
-      const bufferedStartMin = Math.max(0, timeStringToMinutes(earliestDeparture) - 20);
-      const bufferedEndMin = Math.min(23 * 60 + 59, timeStringToMinutes(latestArrival) + 15);
+      const depMin = timeStringToMinutes(earliestDeparture);
+      const arrMin = timeStringToMinutes(latestArrival);
 
-      const shiftStart = minutesToTimeString(bufferedStartMin);
-      const shiftEnd = minutesToTimeString(bufferedEndMin);
+      // Pre-shift briefing: 30 minutes before first departure
+      const shiftStartMin = Math.max(0, depMin - 30);
+      // Post-shift debriefing: 30 minutes after last arrival
+      const shiftEndMin = arrMin + 30;
+
+      const shiftStart = minutesToTimeString(shiftStartMin);
+      const shiftEnd = minutesToTimeString(shiftEndMin);
 
       let durationHours = calculateShiftDurationHours(shiftStart, shiftEnd);
 
-      // Clamp max single duty duration to standard 8.0 hrs if slightly over
       if (durationHours > 8.0) {
         durationHours = 8.0;
       }
@@ -162,7 +153,7 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
         continue;
       }
 
-      // Find an available Driver not already assigned
+      // Find an available Driver
       let selectedDriver = null;
       for (const driver of allDrivers) {
         if (assignedDriverIds.has(driver.id)) continue;
@@ -180,7 +171,7 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
         }
       }
 
-      // Find an available Conductor not already assigned
+      // Find an available Conductor
       let selectedConductor = null;
       for (const conductor of allConductors) {
         if (assignedConductorIds.has(conductor.id)) continue;
@@ -208,38 +199,42 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
         continue;
       }
 
-      // Mark crew as used in this scheduling run
       assignedDriverIds.add(selectedDriver.id);
       assignedConductorIds.add(selectedConductor.id);
 
-      // Generate unique duty identifier (e.g. DTC-LNK-20261113-BBM-001)
       const cleanDate = shiftDate.replace(/-/g, "");
       const depotCode = (bus.depot || "DEL").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase();
-      const dutyNumber = `DTC-LNK-${cleanDate}-${depotCode}-${String(dutySequence).padStart(3, "0")}`;
+      let dutyNumber = `DTC-LNK-${cleanDate}-${depotCode}-${String(dutySequence).padStart(3, "0")}`;
+      while (await prisma.duty.findUnique({ where: { dutyNumber } })) {
+        dutySequence++;
+        dutyNumber = `DTC-LNK-${cleanDate}-${depotCode}-${String(dutySequence).padStart(3, "0")}`;
+      }
       dutySequence++;
 
-      // Create Duty
-      const duty = await Duty.create({
-        dutyNumber,
-        shiftType,
-        shiftDate,
-        startTime: shiftStart,
-        endTime: shiftEnd,
-        depot: bus.depot || depot || "BBM Depot",
-        totalDurationHours: durationHours,
-        status: "Scheduled",
-        schedulingType: "Linked"
+      const duty = await prisma.duty.create({
+        data: {
+          dutyNumber,
+          shiftType,
+          shiftDate,
+          startTime: shiftStart,
+          endTime: shiftEnd,
+          depot: bus.depot || depot || "BBM Depot",
+          totalDurationHours: durationHours,
+          status: "Scheduled",
+          schedulingType: "Linked"
+        }
       });
 
-      // Create permanent 1:1 Linked DutyAssignment
-      const assignment = await DutyAssignment.create({
-        dutyId: duty.id,
-        busId: bus.id,
-        driverId: selectedDriver.id,
-        conductorId: selectedConductor.id,
-        vehicleHandoverVerified: true,
-        totalTripsCovered: busTrips.length,
-        notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
+      const assignment = await prisma.dutyAssignment.create({
+        data: {
+          dutyId: duty.id,
+          busId: bus.id,
+          driverId: selectedDriver.id,
+          conductorId: selectedConductor.id,
+          vehicleHandoverVerified: true,
+          totalTripsCovered: busTrips.length,
+          notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
+        }
       });
 
       createdDuties.push({

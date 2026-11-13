@@ -1,5 +1,4 @@
-import { Op } from "sequelize";
-import { Crew } from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 
 // GET /api/crew
 export async function getAllCrew(req, res, next) {
@@ -17,15 +16,14 @@ export async function getAllCrew(req, res, next) {
 
     const where = {};
 
-    // Search matches crewId, name, badgeNumber, licenseNumber, or assignedDepot
     if (search && search.trim()) {
-      const q = `%${search.trim()}%`;
-      where[Op.or] = [
-        { crewId: { [Op.like]: q } },
-        { name: { [Op.like]: q } },
-        { badgeNumber: { [Op.like]: q } },
-        { licenseNumber: { [Op.like]: q } },
-        { assignedDepot: { [Op.like]: q } }
+      const q = search.trim();
+      where.OR = [
+        { crewId: { contains: q, mode: "insensitive" } },
+        { name: { contains: q, mode: "insensitive" } },
+        { badgeNumber: { contains: q, mode: "insensitive" } },
+        { licenseNumber: { contains: q, mode: "insensitive" } },
+        { assignedDepot: { contains: q, mode: "insensitive" } }
       ];
     }
 
@@ -47,14 +45,17 @@ export async function getAllCrew(req, res, next) {
 
     const validSortFields = ["crewId", "name", "role", "experienceYears", "status", "assignedDepot", "createdAt"];
     const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
-    const orderDirection = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
+    const orderDirection = sortOrder.toUpperCase() === "ASC" ? "asc" : "desc";
 
-    const { count, rows: crewMembers } = await Crew.findAndCountAll({
-      where,
-      order: [[sortField, orderDirection]],
-      limit: limitNum,
-      offset
-    });
+    const [count, crewMembers] = await Promise.all([
+      prisma.crew.count({ where }),
+      prisma.crew.findMany({
+        where,
+        orderBy: { [sortField]: orderDirection },
+        skip: offset,
+        take: limitNum
+      })
+    ]);
 
     const totalPages = Math.ceil(count / limitNum);
 
@@ -65,7 +66,7 @@ export async function getAllCrew(req, res, next) {
         total: count,
         page: pageNum,
         limit: limitNum,
-        totalPages,
+        totalPages: totalPages || 1,
         hasNext: pageNum < totalPages,
         hasPrev: pageNum > 1
       }
@@ -78,20 +79,30 @@ export async function getAllCrew(req, res, next) {
 // GET /api/crew/availability and /api/crew/stats
 export async function getCrewAvailabilityStats(req, res, next) {
   try {
-    const totalCrew = await Crew.count();
-    const drivers = await Crew.count({ where: { role: "Driver" } });
-    const conductors = await Crew.count({ where: { role: "Conductor" } });
-
-    const availableDrivers = await Crew.count({ where: { role: "Driver", status: "Available" } });
-    const availableConductors = await Crew.count({ where: { role: "Conductor", status: "Available" } });
-    const onDutyDrivers = await Crew.count({ where: { role: "Driver", status: "On Duty" } });
-    const onDutyConductors = await Crew.count({ where: { role: "Conductor", status: "On Duty" } });
+    const [
+      totalCrew,
+      drivers,
+      conductors,
+      availableDrivers,
+      availableConductors,
+      onDutyDrivers,
+      onDutyConductors,
+      totalOnRest,
+      totalOnLeave
+    ] = await Promise.all([
+      prisma.crew.count(),
+      prisma.crew.count({ where: { role: "Driver" } }),
+      prisma.crew.count({ where: { role: "Conductor" } }),
+      prisma.crew.count({ where: { role: "Driver", status: "Available" } }),
+      prisma.crew.count({ where: { role: "Conductor", status: "Available" } }),
+      prisma.crew.count({ where: { role: "Driver", status: "On Duty" } }),
+      prisma.crew.count({ where: { role: "Conductor", status: "On Duty" } }),
+      prisma.crew.count({ where: { status: "On Rest" } }),
+      prisma.crew.count({ where: { status: "On Leave" } })
+    ]);
 
     const totalAvailable = availableDrivers + availableConductors;
     const totalOnDuty = onDutyDrivers + onDutyConductors;
-    const totalOnRest = await Crew.count({ where: { status: "On Rest" } });
-    const totalOnLeave = await Crew.count({ where: { status: "On Leave" } });
-
     const availabilityRate = totalCrew > 0 ? Math.round((totalAvailable / totalCrew) * 100) : 0;
 
     return res.status(200).json({
@@ -120,7 +131,7 @@ export async function getCrewAvailabilityStats(req, res, next) {
 export async function getCrewById(req, res, next) {
   try {
     const { id } = req.params;
-    const crewMember = await Crew.findByPk(id);
+    const crewMember = await prisma.crew.findUnique({ where: { id } });
 
     if (!crewMember) {
       return res.status(404).json({
@@ -155,7 +166,9 @@ export async function createCrew(req, res, next) {
     } = req.body;
 
     // Check duplicate crewId
-    const existingCrewId = await Crew.findOne({ where: { crewId: crewId.trim() } });
+    const existingCrewId = await prisma.crew.findUnique({
+      where: { crewId: crewId.trim() }
+    });
     if (existingCrewId) {
       return res.status(409).json({
         success: false,
@@ -164,7 +177,9 @@ export async function createCrew(req, res, next) {
     }
 
     // Check duplicate badgeNumber
-    const existingBadge = await Crew.findOne({ where: { badgeNumber: badgeNumber.trim() } });
+    const existingBadge = await prisma.crew.findUnique({
+      where: { badgeNumber: badgeNumber.trim() }
+    });
     if (existingBadge) {
       return res.status(409).json({
         success: false,
@@ -172,17 +187,19 @@ export async function createCrew(req, res, next) {
       });
     }
 
-    const newCrew = await Crew.create({
-      crewId: crewId.trim(),
-      name: name.trim(),
-      role,
-      badgeNumber: badgeNumber.trim(),
-      licenseNumber: licenseNumber ? licenseNumber.trim() : null,
-      qualification: qualification ? qualification.trim() : (role === "Driver" ? "Commercial Heavy Vehicle Certified" : "Conductor Certified"),
-      experienceYears: Number(experienceYears) || 0,
-      assignedDepot: assignedDepot.trim(),
-      status,
-      phone: phone ? phone.trim() : null
+    const newCrew = await prisma.crew.create({
+      data: {
+        crewId: crewId.trim(),
+        name: name.trim(),
+        role,
+        badgeNumber: badgeNumber.trim(),
+        licenseNumber: licenseNumber ? licenseNumber.trim() : null,
+        qualification: qualification ? qualification.trim() : (role === "Driver" ? "Commercial Heavy Vehicle Certified" : "Conductor Certified"),
+        experienceYears: Number(experienceYears) || 0,
+        assignedDepot: assignedDepot.trim(),
+        status,
+        phone: phone ? phone.trim() : null
+      }
     });
 
     return res.status(201).json({
@@ -191,7 +208,7 @@ export async function createCrew(req, res, next) {
       data: newCrew
     });
   } catch (error) {
-    if (error.name === "SequelizeUniqueConstraintError") {
+    if (error.code === "P2002") {
       return res.status(409).json({
         success: false,
         error: "A crew member with this Crew ID or Badge Number already exists."
@@ -205,7 +222,7 @@ export async function createCrew(req, res, next) {
 export async function updateCrew(req, res, next) {
   try {
     const { id } = req.params;
-    const crewMember = await Crew.findByPk(id);
+    const crewMember = await prisma.crew.findUnique({ where: { id } });
 
     if (!crewMember) {
       return res.status(404).json({
@@ -227,48 +244,63 @@ export async function updateCrew(req, res, next) {
       phone
     } = req.body;
 
+    const updateData = {};
+
     // Check unique crewId if updated
     if (crewId && crewId.trim() !== crewMember.crewId) {
-      const existing = await Crew.findOne({ where: { crewId: crewId.trim() } });
+      const existing = await prisma.crew.findFirst({
+        where: {
+          crewId: crewId.trim(),
+          id: { not: id }
+        }
+      });
       if (existing) {
         return res.status(409).json({
           success: false,
           error: `Crew ID '${crewId.trim()}' is already in use.`
         });
       }
-      crewMember.crewId = crewId.trim();
+      updateData.crewId = crewId.trim();
     }
 
     // Check unique badgeNumber if updated
     if (badgeNumber && badgeNumber.trim() !== crewMember.badgeNumber) {
-      const existing = await Crew.findOne({ where: { badgeNumber: badgeNumber.trim() } });
+      const existing = await prisma.crew.findFirst({
+        where: {
+          badgeNumber: badgeNumber.trim(),
+          id: { not: id }
+        }
+      });
       if (existing) {
         return res.status(409).json({
           success: false,
           error: `Badge number '${badgeNumber.trim()}' is already in use.`
         });
       }
-      crewMember.badgeNumber = badgeNumber.trim();
+      updateData.badgeNumber = badgeNumber.trim();
     }
 
-    if (name !== undefined) crewMember.name = name.trim();
-    if (role !== undefined) crewMember.role = role;
-    if (licenseNumber !== undefined) crewMember.licenseNumber = licenseNumber ? licenseNumber.trim() : null;
-    if (qualification !== undefined) crewMember.qualification = qualification ? qualification.trim() : crewMember.qualification;
-    if (experienceYears !== undefined) crewMember.experienceYears = Number(experienceYears);
-    if (assignedDepot !== undefined) crewMember.assignedDepot = assignedDepot.trim();
-    if (status !== undefined) crewMember.status = status;
-    if (phone !== undefined) crewMember.phone = phone ? phone.trim() : null;
+    if (name !== undefined) updateData.name = name.trim();
+    if (role !== undefined) updateData.role = role;
+    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber ? licenseNumber.trim() : null;
+    if (qualification !== undefined) updateData.qualification = qualification ? qualification.trim() : crewMember.qualification;
+    if (experienceYears !== undefined) updateData.experienceYears = Number(experienceYears);
+    if (assignedDepot !== undefined) updateData.assignedDepot = assignedDepot.trim();
+    if (status !== undefined) updateData.status = status;
+    if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
 
-    await crewMember.save();
+    const updated = await prisma.crew.update({
+      where: { id },
+      data: updateData
+    });
 
     return res.status(200).json({
       success: true,
       message: "Crew details updated successfully.",
-      data: crewMember
+      data: updated
     });
   } catch (error) {
-    if (error.name === "SequelizeUniqueConstraintError") {
+    if (error.code === "P2002") {
       return res.status(409).json({
         success: false,
         error: "Unique constraint violated: Duplicate Crew ID or Badge Number."
@@ -282,7 +314,7 @@ export async function updateCrew(req, res, next) {
 export async function deleteCrew(req, res, next) {
   try {
     const { id } = req.params;
-    const crewMember = await Crew.findByPk(id);
+    const crewMember = await prisma.crew.findUnique({ where: { id } });
 
     if (!crewMember) {
       return res.status(404).json({
@@ -299,7 +331,7 @@ export async function deleteCrew(req, res, next) {
       });
     }
 
-    await crewMember.destroy();
+    await prisma.crew.delete({ where: { id } });
 
     return res.status(200).json({
       success: true,

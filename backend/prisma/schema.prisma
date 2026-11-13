@@ -40,6 +40,8 @@ model Route {
   totalDistance       Float
   estimatedTravelTime Int
   stops               BusStop[]
+  trips               Trip[]
+  buses               Bus[]
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
@@ -60,4 +62,125 @@ model BusStop {
   @@unique([routeId, sequenceNumber])
   @@index([routeId, sequenceNumber])
   @@map("bus_stops")
+}
+
+model Driver {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(100)
+  badgeNumber   String   @unique @map("badge_number") @db.VarChar(50)
+  licenseNumber String   @map("license_number") @db.VarChar(50)
+  phone         String?  @db.VarChar(30)
+  status        String   @default("Available") @db.VarChar(30)
+  buses         Bus[]
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("drivers")
+}
+
+model Bus {
+  id                 String           @id @default(uuid())
+  busNumber          String           @unique @map("bus_number") @db.VarChar(50)
+  registrationNumber String           @unique @map("registration_number") @db.VarChar(50)
+  busType            String           @default("Electric") @map("bus_type") @db.VarChar(50)
+  capacity           Int              @default(40)
+  depot              String?          @default("BBM Depot") @db.VarChar(100)
+  modelYear          Int?             @map("model_year")
+  manufacturer       String?          @default("Tata Motors") @db.VarChar(100)
+  status             String           @default("Active") @db.VarChar(30)
+  routeId            String?          @map("route_id")
+  driverId           String?          @map("driver_id")
+  route              Route?           @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  driver             Driver?          @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  trips              Trip[]
+  dutyAssignments    DutyAssignment[]
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  @@map("buses")
+}
+
+model Crew {
+  id              String           @id @default(uuid())
+  crewId          String           @unique @map("crew_id") @db.VarChar(30)
+  name            String           @db.VarChar(100)
+  role            String           @default("Driver") @db.VarChar(30)
+  badgeNumber     String           @unique @map("badge_number") @db.VarChar(50)
+  licenseNumber   String?          @map("license_number") @db.VarChar(50)
+  qualification   String?          @default("Standard Passenger Transport Certified") @db.VarChar(150)
+  experienceYears Int              @default(1) @map("experience_years")
+  assignedDepot   String           @default("BBM Depot") @map("assigned_depot") @db.VarChar(100)
+  status          String           @default("Available") @db.VarChar(30)
+  phone           String?          @db.VarChar(30)
+  driverDuties    DutyAssignment[] @relation("DutyDriver")
+  conductorDuties DutyAssignment[] @relation("DutyConductor")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@index([role, status])
+  @@index([assignedDepot])
+  @@map("crews")
+}
+
+model Trip {
+  id              String   @id @default(uuid())
+  routeId         String   @map("route_id")
+  busId           String   @map("bus_id")
+  tripDate        String   @map("trip_date") @db.VarChar(15)
+  departureTime   String   @map("departure_time") @db.VarChar(10)
+  arrivalTime     String   @map("arrival_time") @db.VarChar(10)
+  startingStop    String   @map("starting_stop") @db.VarChar(120)
+  destinationStop String   @map("destination_stop") @db.VarChar(120)
+  status          String   @default("Scheduled") @db.VarChar(30)
+  isOvernight     Boolean  @default(false) @map("is_overnight")
+  bus             Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
+  route           Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([busId, tripDate])
+  @@index([tripDate, status])
+  @@map("trips")
+}
+
+model Duty {
+  id                 String          @id @default(uuid())
+  dutyNumber         String          @unique @map("duty_number") @db.VarChar(50)
+  shiftType          String          @default("Morning") @map("shift_type") @db.VarChar(30)
+  shiftDate          String          @map("shift_date") @db.VarChar(15)
+  startTime          String          @map("start_time") @db.VarChar(10)
+  endTime            String          @map("end_time") @db.VarChar(10)
+  depot              String          @default("BBM Depot") @db.VarChar(100)
+  totalDurationHours Float           @default(8.0) @map("total_duration_hours")
+  status             String          @default("Scheduled") @db.VarChar(30)
+  schedulingType     String          @default("Linked") @map("scheduling_type") @db.VarChar(30)
+  assignment         DutyAssignment?
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  @@index([shiftDate, depot])
+  @@index([status])
+  @@map("duties")
+}
+
+model DutyAssignment {
+  id                      String   @id @default(uuid())
+  dutyId                  String   @unique @map("duty_id")
+  busId                   String   @map("bus_id")
+  driverId                String   @map("driver_id")
+  conductorId             String   @map("conductor_id")
+  vehicleHandoverVerified Boolean  @default(true) @map("vehicle_handover_verified")
+  totalTripsCovered       Int      @default(0) @map("total_trips_covered")
+  notes                   String?  @db.Text
+  duty                    Duty     @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  bus                     Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
+  driver                  Crew     @relation("DutyDriver", fields: [driverId], references: [id], onDelete: Cascade)
+  conductor               Crew     @relation("DutyConductor", fields: [conductorId], references: [id], onDelete: Cascade)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@index([busId])
+  @@index([driverId])
+  @@index([conductorId])
+  @@map("duty_assignments")
 }

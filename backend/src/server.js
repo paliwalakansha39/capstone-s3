@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
-import { initDatabaseConnection } from "./config/database.js";
 import { runMigrations } from "./scripts/migrate.js";
 import { prisma } from "./config/prisma.js";
 
@@ -14,16 +13,9 @@ const PORT = process.env.PORT || 5001;
 
 async function startServer() {
   try {
-    console.log("Initializing database connection...");
-    await initDatabaseConnection();
-    await runMigrations();
-
-    try {
-      await prisma.$connect();
-      console.log("PostgreSQL connected via Prisma.");
-    } catch (prismaError) {
-      console.warn("Notice: PostgreSQL is not connected. SQLite modules (Buses, Crews, Trips, Duties) will run normally.");
-    }
+    console.log("Connecting to PostgreSQL database via Prisma...");
+    await prisma.$connect();
+    console.log("PostgreSQL connected successfully.");
 
     const app = createApp();
     const server = app.listen(PORT, () => {

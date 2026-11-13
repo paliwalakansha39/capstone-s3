@@ -1,11 +1,4 @@
-import { Op } from "sequelize";
-import {
-  sequelize,
-  Bus,
-  Crew,
-  Duty,
-  DutyAssignment
-} from "../models/index.js";
+import { prisma } from "../config/prisma.js";
 import {
   calculateShiftDurationHours
 } from "../middleware/dutyValidationMiddleware.js";
@@ -33,13 +26,13 @@ export async function getAllDuties(req, res, next) {
     const where = {};
 
     if (search && search.trim()) {
-      const q = `%${search.trim()}%`;
-      where[Op.or] = [
-        { dutyNumber: { [Op.like]: q } },
-        { depot: { [Op.like]: q } },
-        { "$assignment.bus.bus_number$": { [Op.like]: q } },
-        { "$assignment.driver.name$": { [Op.like]: q } },
-        { "$assignment.conductor.name$": { [Op.like]: q } }
+      const q = search.trim();
+      where.OR = [
+        { dutyNumber: { contains: q, mode: "insensitive" } },
+        { depot: { contains: q, mode: "insensitive" } },
+        { assignment: { bus: { busNumber: { contains: q, mode: "insensitive" } } } },
+        { assignment: { driver: { name: { contains: q, mode: "insensitive" } } } },
+        { assignment: { conductor: { name: { contains: q, mode: "insensitive" } } } }
       ];
     }
 
@@ -59,9 +52,8 @@ export async function getAllDuties(req, res, next) {
       where.status = status.trim();
     }
 
-    const assignmentWhere = {};
     if (busId && busId.trim() && busId !== "all") {
-      assignmentWhere.busId = busId.trim();
+      where.assignment = { busId: busId.trim() };
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -70,39 +62,32 @@ export async function getAllDuties(req, res, next) {
 
     const validSortFields = ["shiftDate", "startTime", "endTime", "status", "dutyNumber", "createdAt"];
     const sortField = validSortFields.includes(sortBy) ? sortBy : "shiftDate";
-    const orderDirection = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
+    const orderDirection = sortOrder.toUpperCase() === "ASC" ? "asc" : "desc";
 
-    const { count, rows: duties } = await Duty.findAndCountAll({
-      where,
-      include: [
-        {
-          model: DutyAssignment,
-          as: "assignment",
-          where: Object.keys(assignmentWhere).length ? assignmentWhere : undefined,
-          required: false,
-          include: [
-            {
-              model: Bus,
-              as: "bus",
-              attributes: ["id", "busNumber", "registrationNumber", "busType", "depot"]
-            },
-            {
-              model: Crew,
-              as: "driver",
-              attributes: ["id", "name", "crewId", "badgeNumber", "phone"]
-            },
-            {
-              model: Crew,
-              as: "conductor",
-              attributes: ["id", "name", "crewId", "badgeNumber", "phone"]
+    const [count, duties] = await Promise.all([
+      prisma.duty.count({ where }),
+      prisma.duty.findMany({
+        where,
+        include: {
+          assignment: {
+            include: {
+              bus: {
+                select: { id: true, busNumber: true, registrationNumber: true, busType: true, depot: true }
+              },
+              driver: {
+                select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true }
+              },
+              conductor: {
+                select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true }
+              }
             }
-          ]
-        }
-      ],
-      order: [[sortField, orderDirection]],
-      limit: limitNum,
-      offset
-    });
+          }
+        },
+        orderBy: { [sortField]: orderDirection },
+        skip: offset,
+        take: limitNum
+      })
+    ]);
 
     const totalPages = Math.ceil(count / limitNum);
 
@@ -113,7 +98,7 @@ export async function getAllDuties(req, res, next) {
         total: count,
         page: pageNum,
         limit: limitNum,
-        totalPages,
+        totalPages: totalPages || 1,
         hasNext: pageNum < totalPages,
         hasPrev: pageNum > 1
       }
@@ -129,37 +114,29 @@ export async function getAllDuties(req, res, next) {
  */
 export async function getDutyStats(req, res, next) {
   try {
-    const totalDuties = await Duty.count();
-    const scheduledDuties = await Duty.count({ where: { status: "Scheduled" } });
-    const activeDuties = await Duty.count({ where: { status: "Active" } });
-    const completedDuties = await Duty.count({ where: { status: "Completed" } });
-    const cancelledDuties = await Duty.count({ where: { status: "Cancelled" } });
+    const [
+      totalDuties,
+      scheduledDuties,
+      activeDuties,
+      completedDuties,
+      cancelledDuties,
+      activeAssignments
+    ] = await Promise.all([
+      prisma.duty.count(),
+      prisma.duty.count({ where: { status: "Scheduled" } }),
+      prisma.duty.count({ where: { status: "Active" } }),
+      prisma.duty.count({ where: { status: "Completed" } }),
+      prisma.duty.count({ where: { status: "Cancelled" } }),
+      prisma.dutyAssignment.findMany({
+        where: {
+          duty: { status: { in: ["Scheduled", "Active"] } }
+        },
+        select: { busId: true, driverId: true }
+      })
+    ]);
 
-    // Distinct buses with active/scheduled duties
-    const assignedBusesCount = await DutyAssignment.count({
-      distinct: true,
-      col: "bus_id",
-      include: [
-        {
-          model: Duty,
-          as: "duty",
-          where: { status: { [Op.in]: ["Scheduled", "Active"] } }
-        }
-      ]
-    });
-
-    // Distinct drivers with active/scheduled duties
-    const assignedDriversCount = await DutyAssignment.count({
-      distinct: true,
-      col: "driver_id",
-      include: [
-        {
-          model: Duty,
-          as: "duty",
-          where: { status: { [Op.in]: ["Scheduled", "Active"] } }
-        }
-      ]
-    });
+    const assignedBusesCount = new Set(activeAssignments.map((a) => a.busId)).size;
+    const assignedDriversCount = new Set(activeAssignments.map((a) => a.driverId)).size;
 
     return res.status(200).json({
       success: true,
@@ -186,30 +163,23 @@ export async function getDutyById(req, res, next) {
   try {
     const { id } = req.params;
 
-    const duty = await Duty.findByPk(id, {
-      include: [
-        {
-          model: DutyAssignment,
-          as: "assignment",
-          include: [
-            {
-              model: Bus,
-              as: "bus",
-              attributes: ["id", "busNumber", "registrationNumber", "busType", "depot", "capacity"]
+    const duty = await prisma.duty.findUnique({
+      where: { id },
+      include: {
+        assignment: {
+          include: {
+            bus: {
+              select: { id: true, busNumber: true, registrationNumber: true, busType: true, depot: true, capacity: true }
             },
-            {
-              model: Crew,
-              as: "driver",
-              attributes: ["id", "name", "crewId", "badgeNumber", "licenseNumber", "phone", "status"]
+            driver: {
+              select: { id: true, name: true, crewId: true, badgeNumber: true, licenseNumber: true, phone: true, status: true }
             },
-            {
-              model: Crew,
-              as: "conductor",
-              attributes: ["id", "name", "crewId", "badgeNumber", "phone", "status"]
+            conductor: {
+              select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true, status: true }
             }
-          ]
+          }
         }
-      ]
+      }
     });
 
     if (!duty) {
@@ -266,8 +236,9 @@ export async function createDuty(req, res, next) {
       notes
     } = req.body;
 
-    // Check unique dutyNumber
-    const existing = await Duty.findOne({ where: { dutyNumber: dutyNumber.trim() } });
+    const existing = await prisma.duty.findUnique({
+      where: { dutyNumber: dutyNumber.trim() }
+    });
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -277,34 +248,36 @@ export async function createDuty(req, res, next) {
 
     const duration = calculateShiftDurationHours(startTime, endTime);
 
-    const newDuty = await Duty.create({
-      dutyNumber: dutyNumber.trim(),
-      shiftType,
-      shiftDate,
-      startTime,
-      endTime,
-      depot,
-      totalDurationHours: duration,
-      status: "Scheduled",
-      schedulingType: "Linked"
-    });
-
-    const assignment = await DutyAssignment.create({
-      dutyId: newDuty.id,
-      busId,
-      driverId,
-      conductorId,
-      vehicleHandoverVerified: true,
-      notes: notes || "Manual Linked Duty assignment."
+    const newDuty = await prisma.duty.create({
+      data: {
+        dutyNumber: dutyNumber.trim(),
+        shiftType,
+        shiftDate,
+        startTime,
+        endTime,
+        depot,
+        totalDurationHours: duration,
+        status: "Scheduled",
+        schedulingType: "Linked",
+        assignment: {
+          create: {
+            busId,
+            driverId,
+            conductorId,
+            vehicleHandoverVerified: true,
+            notes: notes || "Manual Linked Duty assignment."
+          }
+        }
+      },
+      include: {
+        assignment: true
+      }
     });
 
     return res.status(201).json({
       success: true,
       message: "Linked Duty scheduled successfully.",
-      data: {
-        ...newDuty.toJSON(),
-        assignment
-      }
+      data: newDuty
     });
   } catch (error) {
     next(error);
@@ -320,8 +293,9 @@ export async function updateDuty(req, res, next) {
     const { id } = req.params;
     const { status, shiftType, startTime, endTime, notes } = req.body;
 
-    const duty = await Duty.findByPk(id, {
-      include: [{ model: DutyAssignment, as: "assignment" }]
+    const duty = await prisma.duty.findUnique({
+      where: { id },
+      include: { assignment: true }
     });
 
     if (!duty) {
@@ -331,26 +305,35 @@ export async function updateDuty(req, res, next) {
       });
     }
 
-    if (status !== undefined) duty.status = status;
-    if (shiftType !== undefined) duty.shiftType = shiftType;
-    if (startTime !== undefined) duty.startTime = startTime;
-    if (endTime !== undefined) duty.endTime = endTime;
+    const updateData = {};
+    if (status !== undefined) updateData.status = status;
+    if (shiftType !== undefined) updateData.shiftType = shiftType;
+    if (startTime !== undefined) updateData.startTime = startTime;
+    if (endTime !== undefined) updateData.endTime = endTime;
 
-    if (startTime && endTime) {
-      duty.totalDurationHours = calculateShiftDurationHours(duty.startTime, duty.endTime);
+    const targetStart = startTime !== undefined ? startTime : duty.startTime;
+    const targetEnd = endTime !== undefined ? endTime : duty.endTime;
+    if (startTime !== undefined || endTime !== undefined) {
+      updateData.totalDurationHours = calculateShiftDurationHours(targetStart, targetEnd);
     }
-
-    await duty.save();
 
     if (notes !== undefined && duty.assignment) {
-      duty.assignment.notes = notes;
-      await duty.assignment.save();
+      await prisma.dutyAssignment.update({
+        where: { dutyId: id },
+        data: { notes }
+      });
     }
+
+    const updated = await prisma.duty.update({
+      where: { id },
+      data: updateData,
+      include: { assignment: true }
+    });
 
     return res.status(200).json({
       success: true,
       message: "Duty updated successfully.",
-      data: duty
+      data: updated
     });
   } catch (error) {
     next(error);
@@ -365,7 +348,7 @@ export async function deleteDuty(req, res, next) {
   try {
     const { id } = req.params;
 
-    const duty = await Duty.findByPk(id);
+    const duty = await prisma.duty.findUnique({ where: { id } });
 
     if (!duty) {
       return res.status(404).json({
@@ -381,7 +364,7 @@ export async function deleteDuty(req, res, next) {
       });
     }
 
-    await duty.destroy();
+    await prisma.duty.delete({ where: { id } });
 
     return res.status(200).json({
       success: true,

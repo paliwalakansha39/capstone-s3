@@ -1,12 +1,11 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { Op } from "sequelize";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
 import { runMigrations } from "../src/scripts/migrate.js";
 import { seedDatabase } from "../src/scripts/seed.js";
-import { Bus, Crew, Duty, DutyAssignment, Trip } from "../src/models/index.js";
+import { Bus, Crew, Duty } from "../src/models/index.js";
 
 let server;
 let baseUrl;
@@ -50,13 +49,13 @@ describe("DTC Linked Duty Scheduling API Test Suite (Chunk 6)", () => {
   const testDutyNumber = "DTC-TEST-DUTY-9901";
 
   before(async () => {
-    sampleBus = await Bus.findOne({ where: { status: "Active" } });
-    sampleDriver = await Crew.findOne({ where: { role: "Driver" } });
-    sampleConductor = await Crew.findOne({ where: { role: "Conductor" } });
+    sampleBus = await Bus.findFirst({ where: { status: "Active" } });
+    sampleDriver = await Crew.findFirst({ where: { role: "Driver" } });
+    sampleConductor = await Crew.findFirst({ where: { role: "Conductor" } });
 
     // Clean up test duties if any
-    await Duty.destroy({
-      where: { dutyNumber: { [Op.like]: "%TEST%" } }
+    await Duty.deleteMany({
+      where: { dutyNumber: { contains: "TEST" } }
     });
   });
 
@@ -187,11 +186,11 @@ describe("DTC Linked Duty Scheduling API Test Suite (Chunk 6)", () => {
 
   // 7. Collision - reject overlapping duty for same bus
   it("POST /api/duties should reject bus conflict during overlapping hours with 409", async () => {
-    const anotherDriver = await Crew.findOne({
-      where: { role: "Driver", id: { [Op.ne]: sampleDriver.id } }
+    const anotherDriver = await Crew.findFirst({
+      where: { role: "Driver", id: { not: sampleDriver.id } }
     });
-    const anotherConductor = await Crew.findOne({
-      where: { role: "Conductor", id: { [Op.ne]: sampleConductor.id } }
+    const anotherConductor = await Crew.findFirst({
+      where: { role: "Conductor", id: { not: sampleConductor.id } }
     });
 
     const payload = {
