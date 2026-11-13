@@ -80,6 +80,15 @@ This document tracks all project contributions across the three core academic su
     - Driver and conductor schedule overlap detection preventing double-booking.
     - Role and qualification verification (rejects non-drivers as driver, non-conductors as conductor, and inactive/leave crew).
 
+### Commit 4: Automated Linked Duty Scheduling Algorithm Engine (Subject: ASD)
+- **Files Created**:
+  - `backend/src/services/dutySchedulerEngine.js`: Developed the core automated Linked Duty Scheduling algorithm:
+    - Analyzes daily trips per bus and groups them into contiguous shifts.
+    - Matches available, qualified driver-conductor pairs from the crew pool based on depot and conflict checks.
+    - Enforces strict 1:1 permanent crew-to-bus binding across the shift window with vehicle handover verification.
+    - Atomically creates `Duty` and `DutyAssignment` records with transaction rollback protection.
+
+
 
 
 
