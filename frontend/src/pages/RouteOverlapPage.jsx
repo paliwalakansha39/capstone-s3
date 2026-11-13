@@ -75,9 +75,23 @@ export default function RouteOverlapPage() {
   const [routeName, setRouteName] = useState("New Proposed Route");
   const [drawingMode, setDrawingMode] = useState(true);
 
-  const handleAddPoint = useCallback((newPoint) => {
-    setProposedPoints((prev) => [...prev, newPoint]);
+  const handleUpdatePoint = useCallback((index, updatedFields) => {
+    setProposedPoints((prev) =>
+      prev.map((p, idx) => (idx === index ? { ...p, ...updatedFields } : p))
+    );
   }, []);
+
+  const handleRemovePoint = useCallback((index) => {
+    setProposedPoints((prev) => prev.filter((_, idx) => idx !== index));
+  }, []);
+
+  const handleMarkerDragEnd = useCallback((index, event) => {
+    const latlng = event.target.getLatLng();
+    handleUpdatePoint(index, {
+      latitude: parseFloat(latlng.lat.toFixed(6)),
+      longitude: parseFloat(latlng.lng.toFixed(6))
+    });
+  }, [handleUpdatePoint]);
 
   const handleClearRoute = () => {
     setProposedPoints([]);
@@ -180,12 +194,39 @@ export default function RouteOverlapPage() {
                   <Marker
                     key={point.id || index}
                     position={[point.latitude, point.longitude]}
+                    draggable={true}
+                    eventHandlers={{
+                      dragend: (e) => handleMarkerDragEnd(index, e)
+                    }}
                     icon={createNumberedWaypointIcon(index + 1, isTerminal)}
                   >
                     <Popup>
                       <div className="waypoint-popup">
                         <strong>Waypoint {index + 1}</strong>
                         <p>{point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</p>
+                        <small style={{ color: "#64748b", display: "block", marginBottom: "6px" }}>
+                          Drag marker to adjust position
+                        </small>
+                        <button
+                          type="button"
+                          className="button-link-danger"
+                          onClick={() => handleRemovePoint(index)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#ef4444",
+                            cursor: "pointer",
+                            padding: 0,
+                            font: "inherit",
+                            fontWeight: 600,
+                            fontSize: "12px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          <Trash2 size={13} /> Remove Waypoint
+                        </button>
                       </div>
                     </Popup>
                   </Marker>
