@@ -1,4 +1,4 @@
-import { sequelize, Bus, Route, Driver, Crew, Trip } from "../models/index.js";
+import { sequelize, Bus, Route, Driver, Crew, Trip, Duty, DutyAssignment } from "../models/index.js";
 import { runMigrations } from "./migrate.js";
 
 export async function seedDatabase() {
@@ -387,6 +387,103 @@ export async function seedDatabase() {
       await Trip.bulkCreate(sampleTrips);
       console.log(`Successfully seeded ${sampleTrips.length} sample trips.`);
     }
+  }
+
+  // Seed Linked Duty Schedules (Chunk 6)
+  const existingDuties = await Duty.count();
+  if (existingDuties === 0) {
+    console.log("Seeding sample DTC Linked Duty schedules...");
+
+    const bus1041 = await Bus.findOne({ where: { busNumber: "DTC-1041" } });
+    const bus1042 = await Bus.findOne({ where: { busNumber: "DTC-1042" } });
+    const bus2105 = await Bus.findOne({ where: { busNumber: "DTC-2105" } });
+
+    const driverRajesh = await Crew.findOne({ where: { crewId: "DTC-CRW-101" } });
+    const driverSunil = await Crew.findOne({ where: { crewId: "DTC-CRW-102" } });
+    const driverManoj = await Crew.findOne({ where: { crewId: "DTC-CRW-103" } });
+
+    const conductorPriya = await Crew.findOne({ where: { crewId: "DTC-CRW-201" } });
+    const conductorHarish = await Crew.findOne({ where: { crewId: "DTC-CRW-202" } });
+    const conductorSuresh = await Crew.findOne({ where: { crewId: "DTC-CRW-205" } });
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Duty 1: Linked Morning Shift at BBM Depot (Bus DTC-1041 + Rajesh Kumar + Priya Sharma)
+    if (bus1041 && driverRajesh && conductorPriya) {
+      const duty1 = await Duty.create({
+        dutyNumber: "DTC-LNK-20261113-001",
+        shiftType: "Morning",
+        shiftDate: today,
+        startTime: "06:00",
+        endTime: "14:00",
+        depot: "BBM Depot",
+        totalDurationHours: 8.0,
+        status: "Active",
+        schedulingType: "Linked"
+      });
+
+      await DutyAssignment.create({
+        dutyId: duty1.id,
+        busId: bus1041.id,
+        driverId: driverRajesh.id,
+        conductorId: conductorPriya.id,
+        vehicleHandoverVerified: true,
+        totalTripsCovered: 2,
+        notes: "Linked Morning Shift: Crew remains permanently assigned to bus DTC-1041 for all trips."
+      });
+    }
+
+    // Duty 2: Linked Evening Shift at BBM Depot (Bus DTC-1042 + Sunil Verma + Suresh Gupta)
+    if (bus1042 && driverSunil && conductorSuresh) {
+      const duty2 = await Duty.create({
+        dutyNumber: "DTC-LNK-20261113-002",
+        shiftType: "Evening",
+        shiftDate: today,
+        startTime: "14:00",
+        endTime: "22:00",
+        depot: "BBM Depot",
+        totalDurationHours: 8.0,
+        status: "Scheduled",
+        schedulingType: "Linked"
+      });
+
+      await DutyAssignment.create({
+        dutyId: duty2.id,
+        busId: bus1042.id,
+        driverId: driverSunil.id,
+        conductorId: conductorSuresh.id,
+        vehicleHandoverVerified: true,
+        totalTripsCovered: 2,
+        notes: "Linked Evening Shift: Crew remains bound to bus DTC-1042 on Route 502."
+      });
+    }
+
+    // Duty 3: Linked Morning Shift at Sarojini Nagar Depot (Bus DTC-2105 + Manoj Singh + Harish Rawat)
+    if (bus2105 && driverManoj && conductorHarish) {
+      const duty3 = await Duty.create({
+        dutyNumber: "DTC-LNK-20261113-003",
+        shiftType: "Morning",
+        shiftDate: today,
+        startTime: "06:00",
+        endTime: "13:30",
+        depot: "Sarojini Nagar Depot",
+        totalDurationHours: 7.5,
+        status: "Completed",
+        schedulingType: "Linked"
+      });
+
+      await DutyAssignment.create({
+        dutyId: duty3.id,
+        busId: bus2105.id,
+        driverId: driverManoj.id,
+        conductorId: conductorHarish.id,
+        vehicleHandoverVerified: true,
+        totalTripsCovered: 2,
+        notes: "Linked Airport Express Shift: Dedicated crew-bus assignment for IGI Airport T3 rotation."
+      });
+    }
+
+    console.log("Successfully seeded sample Linked Duty schedules.");
   }
 }
 

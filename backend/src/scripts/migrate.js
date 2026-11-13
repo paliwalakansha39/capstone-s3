@@ -1,4 +1,4 @@
-import { sequelize, Bus, Route, Driver, Crew, Trip } from "../models/index.js";
+import { sequelize, Bus, Route, Driver, Crew, Trip, Duty, DutyAssignment } from "../models/index.js";
 import { initDatabaseConnection } from "../config/database.js";
 
 export async function runMigrations() {
@@ -20,8 +20,25 @@ export async function runMigrations() {
       "CREATE INDEX IF NOT EXISTS idx_trips_status ON trips (status);"
     );
 
+    // Database indexes for linked duties & assignments
+    await sequelize.query(
+      "CREATE INDEX IF NOT EXISTS idx_duties_date_depot ON duties (shift_date, depot);"
+    );
+    await sequelize.query(
+      "CREATE INDEX IF NOT EXISTS idx_duties_status ON duties (status);"
+    );
+    await sequelize.query(
+      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_bus ON duty_assignments (bus_id);"
+    );
+    await sequelize.query(
+      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_driver ON duty_assignments (driver_id);"
+    );
+    await sequelize.query(
+      "CREATE INDEX IF NOT EXISTS idx_duty_assignments_conductor ON duty_assignments (conductor_id);"
+    );
+
     console.log("Database schema synced successfully.");
-    console.log("Tables verified: routes, drivers, buses, crews, trips.");
+    console.log("Tables verified: routes, drivers, buses, crews, trips, duties, duty_assignments.");
     return true;
   } catch (error) {
     console.error("Migration failed:", error);

@@ -66,6 +66,12 @@ This document tracks all project contributions across the three core academic su
 - **Files Modified**:
   - `backend/src/models/index.js`: Registered `Duty` and `DutyAssignment` models and established 1:1 duty assignment, bus, driver, and conductor associations.
 
+### Commit 2: Duty Migrations & Sample DTC Linked Duty Seeding (Subject: DE)
+- **Files Modified**:
+  - `backend/src/scripts/migrate.js`: Added `duties` and `duty_assignments` database migration synchronization with optimized composite indexes on `(shift_date, depot)`, `status`, `bus_id`, `driver_id`, and `conductor_id`.
+  - `backend/src/scripts/seed.js`: Seeded realistic DTC linked duty shifts pairing active fleet buses (e.g. `DTC-1041`, `DTC-1042`, `DTC-2105`) permanently with dedicated driver-conductor crew pairs for their full shifts without mid-shift vehicle swaps.
+
+
 
 
 
