@@ -88,6 +88,16 @@ This document tracks all project contributions across the three core academic su
     - Enforces strict 1:1 permanent crew-to-bus binding across the shift window with vehicle handover verification.
     - Atomically creates `Duty` and `DutyAssignment` records with transaction rollback protection.
 
+### Commit 5: Duty Management REST APIs & Automated Test Suite (Subject: ASD)
+- **Files Created**:
+  - `backend/src/controllers/dutyController.js`: Implemented `getDuties` (with pagination, search, status/depot/shiftType filters), `getDutyStats` (metrics for scheduled, active, and linked crew/bus counts), `getDutyById` (deep association eager loading), `generateLinkedDutiesHandler` (automated algorithm endpoint), `createDuty` (manual linked duty scheduling), `updateDuty`, and `deleteDuty` (with active shift deletion protection).
+  - `backend/src/routes/dutyRoutes.js`: Defined REST routing hierarchy for `/api/duties` with authentication guards and validation middlewares.
+  - `backend/tests/duty.test.js`: Comprehensive 12-test automated suite verifying pagination, stats, shift duration limits (<= 8.0 hrs), role integrity, duplicate time conflict rejection, full linked duty creation, status lifecycle, automated scheduling generation, and deletion safety checks.
+- **Files Modified**:
+  - `backend/src/routes/index.js`: Mounted `/api/duties` route into main Express API router.
+  - `backend/src/services/dutySchedulerEngine.js`: Refined automated scheduling engine database operations for resilient concurrency.
+  - Test validation: 71/71 tests passing across all 6 test suites.
+
 
 
 

@@ -53,8 +53,6 @@ function determineShiftType(startTime, endTime) {
  * remaining permanently bound to that bus throughout all its scheduled trips.
  */
 export async function generateLinkedDuties({ shiftDate, depot = null, adminId = null }) {
-  const transaction = await sequelize.transaction();
-
   try {
     // 1. Fetch scheduled trips on target date
     const tripWhere = {
@@ -77,12 +75,10 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
           attributes: ["id", "routeNumber", "routeName"]
         }
       ],
-      order: [["departureTime", "ASC"]],
-      transaction
+      order: [["departureTime", "ASC"]]
     });
 
     if (trips.length === 0) {
-      await transaction.rollback();
       return {
         success: false,
         message: `No active or scheduled trips found for date ${shiftDate}${depot ? ` at ${depot}` : ""}.`,
@@ -111,14 +107,12 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
 
     const allDrivers = await Crew.findAll({
       where: { ...crewWhere, role: "Driver" },
-      order: [["experienceYears", "DESC"]],
-      transaction
+      order: [["experienceYears", "DESC"]]
     });
 
     const allConductors = await Crew.findAll({
       where: { ...crewWhere, role: "Conductor" },
-      order: [["experienceYears", "DESC"]],
-      transaction
+      order: [["experienceYears", "DESC"]]
     });
 
     const assignedDriverIds = new Set();
@@ -225,34 +219,28 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       dutySequence++;
 
       // Create Duty
-      const duty = await Duty.create(
-        {
-          dutyNumber,
-          shiftType,
-          shiftDate,
-          startTime: shiftStart,
-          endTime: shiftEnd,
-          depot: bus.depot || depot || "BBM Depot",
-          totalDurationHours: durationHours,
-          status: "Scheduled",
-          schedulingType: "Linked"
-        },
-        { transaction }
-      );
+      const duty = await Duty.create({
+        dutyNumber,
+        shiftType,
+        shiftDate,
+        startTime: shiftStart,
+        endTime: shiftEnd,
+        depot: bus.depot || depot || "BBM Depot",
+        totalDurationHours: durationHours,
+        status: "Scheduled",
+        schedulingType: "Linked"
+      });
 
       // Create permanent 1:1 Linked DutyAssignment
-      const assignment = await DutyAssignment.create(
-        {
-          dutyId: duty.id,
-          busId: bus.id,
-          driverId: selectedDriver.id,
-          conductorId: selectedConductor.id,
-          vehicleHandoverVerified: true,
-          totalTripsCovered: busTrips.length,
-          notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
-        },
-        { transaction }
-      );
+      const assignment = await DutyAssignment.create({
+        dutyId: duty.id,
+        busId: bus.id,
+        driverId: selectedDriver.id,
+        conductorId: selectedConductor.id,
+        vehicleHandoverVerified: true,
+        totalTripsCovered: busTrips.length,
+        notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
+      });
 
       createdDuties.push({
         duty,
@@ -264,8 +252,6 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       });
     }
 
-    await transaction.commit();
-
     return {
       success: true,
       message: `Generated ${createdDuties.length} linked duty schedule(s) for ${shiftDate}.`,
@@ -275,7 +261,6 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       warnings
     };
   } catch (error) {
-    await transaction.rollback();
     throw error;
   }
 }
