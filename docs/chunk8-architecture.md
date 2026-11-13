@@ -36,3 +36,25 @@ Chunk 8 introduces the ability for administrators to draw proposed routes and de
 2. Overlap analysis records need to be stored with timestamps, administrative audit trails, overlap distances, and overlap percentages.
 3. Overlapping segments must be saved with coordinate geometries for map overlay rendering.
 4. Existing route management and scheduling modules (Chunks 1–6) must remain completely unaffected.
+
+
+## 2. Map Integration and Route Coordinate Data Structures
+
+### 2.1 Existing Map Technology Stack
+- **Library**: `leaflet` (v1.9.4) & `react-leaflet` (v5.0.0).
+- **Base Tile Provider**: OpenStreetMap (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`).
+- **Default Viewport**: Delhi Metropolitan Region (`[28.6139, 77.209]`, zoom level 11-14).
+- **Marker Styling**: Custom CSS HTML divIcons (`route-marker`, `route-marker-terminal`).
+- **Polyline Rendering**: Leaflet `Polyline` component with geodesic coordinate arrays `[[lat, lng], ...]`.
+
+### 2.2 Route Representation and Coordinate Structures
+- **Existing Routes**: Represented as an ordered sequence of bus stops $\mathcal{S} = [S_1, S_2, \dots, S_n]$ where each stop $S_i = (\text{lat}_i, \text{lon}_i)$. The route path is a piecewise linear polyline formed by segments $[S_i, S_{i+1}]$.
+- **Proposed Routes**: Represented as a sequence of user-drawn waypoints $\mathcal{P} = [P_1, P_2, \dots, P_m]$ where $P_k = (\text{lat}_k, \text{lon}_k)$.
+- **Segment Breakdown**:
+  - Proposed segment $j$: $Seg_j = (P_j, P_{j+1})$ with length $L_j = \text{haversine}(P_j, P_{j+1})$.
+  - Existing segment $k$: $Seg_k = (S_k, S_{k+1})$ with length $L_k = \text{haversine}(S_k, S_{k+1})$.
+- **Color Coding Specification**:
+  - **Proposed Route**: Blue (`#2563eb`, weight 4, opacity 0.9).
+  - **Existing Routes**: Grey (`#94a3b8`, weight 3, opacity 0.7).
+  - **Overlapping Sections**: Red (`#ef4444`, weight 6, opacity 0.95).
+  - **Non-Overlapping Sections**: Green (`#10b981`, weight 4, opacity 0.9).
