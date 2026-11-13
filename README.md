@@ -82,7 +82,7 @@ The frontend runs at **`http://localhost:5173`** and automatically proxies `/api
 
 ### 3. Run Automated Tests
 
-To run the complete automated test suite (59+ tests covering all modules):
+To run the complete automated test suite (71+ tests across 6 test suites):
 
 ```sh
 cd backend
@@ -127,6 +127,15 @@ Send `Authorization: Bearer <token>` for protected API requests. The browser cle
 - `POST /api/trips` — Schedule a new trip with validation and bus conflict prevention (Admin only)
 - `PUT /api/trips/:id` — Update trip details, schedule, or status with conflict checking (Admin only)
 - `DELETE /api/trips/:id` — Safely remove scheduled trip (Admin only)
+
+## Linked Duty Scheduling API Endpoints (Chunk 6)
+- `GET /api/duties` — List duties (supports search, shiftType, shiftDate, depot, status filters, and pagination)
+- `GET /api/duties/stats` — Aggregate metrics (total, scheduled, active, completed, cancelled, bound buses, linked drivers)
+- `GET /api/duties/:id` — Retrieve full duty details with populated bus, driver, and conductor assignments
+- `POST /api/duties/generate-linked` — Automated Linked Duty Scheduling Engine (groups scheduled trips into &le; 8.0 hr shifts and binds dedicated 1:1 crew pairs without mid-shift vehicle handover)
+- `POST /api/duties` — Create manual linked duty schedule (with &le; 8.0 hr duration, qualification, and double-booking collision guards)
+- `PUT /api/duties/:id` — Update duty shift status, times, or notes
+- `DELETE /api/duties/:id` — Safely remove duty schedule (deletion of active on-road duties is blocked)
 
 ## Route and Bus Stop Management
 

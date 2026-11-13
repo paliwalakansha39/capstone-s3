@@ -12,6 +12,7 @@ import UsersPage from "./pages/UsersPage";
 import BusManagementPage from "./pages/BusManagementPage";
 import CrewManagementPage from "./pages/CrewManagementPage";
 import TripManagementPage from "./pages/TripManagementPage";
+import DutySchedulingPage from "./pages/DutySchedulingPage";
 const RouteManagementPage = lazy(() => import("./pages/RouteManagementPage"));
 
 export default function App() {
@@ -30,7 +31,7 @@ export default function App() {
       <Route path="trips" element={<TripManagementPage />} />
       <Route path="routes" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading route management...</main>}><RouteManagementPage /></Suspense>} />
       {/* Chunk 6: Linked Duty Scheduling */}
-      <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
+      <Route path="duties" element={<DutySchedulingPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;

@@ -110,6 +110,21 @@ This document tracks all project contributions across the three core academic su
   - `frontend/src/App.jsx`: Registered administrative `/admin/duties` routing.
   - `frontend/src/layouts/AdminLayout.jsx`: Configured sidebar navigation link with dedicated `CalendarCheck` icon and active navigation indicators.
 
+### Commit 7: Interactive Linked Duty Scheduling Dashboard & Assignment Matrix UI (Subject: ISD)
+- **Files Created**:
+  - `frontend/src/pages/DutySchedulingPage.jsx`: Developed comprehensive administrative interface for Linked Duty Scheduling:
+    - Live KPI metric cards for total duties, active shifts, assigned buses, and bound crew pairs.
+    - "Auto-Generate Shifts" modal integrating the automated scheduling engine with real-time feedback and warning summaries.
+    - Comprehensive filter toolbar: Search box, date picker, shift type dropdown, depot selector, status filter, and live refresh.
+    - Duty Assignment Matrix Table: Displays permanent 1:1 linked relationships (`Duty Number ⇄ Shift Time ⇄ Bus ⇄ Driver & Conductor ⇄ Status`).
+    - Manual Duty Scheduling Modal: Interactive form with live duration calculation and instant DTC &le; 8.0 hr maximum shift constraint enforcement.
+    - Duty Inspector Modal: Detailed view of permanent vehicle allocation, crew certifications, and one-click shift status update controls (`Mark Active`, `Complete Shift`, `Cancel Duty`).
+    - Safe Deletion Modal: Deletion safeguard blocking the accidental removal of active on-road duties.
+- **Files Modified**:
+  - `frontend/src/App.jsx`: Mounted `DutySchedulingPage` onto `/admin/duties` route.
+  - `frontend/src/pages/DashboardPage.jsx`: Integrated live linked duty metrics and quick-access navigation link.
+  - `README.md`: Documented Chunk 6 endpoints, dual-database architecture, and updated automated test verification counts (71/71 tests).
+
 
 
 
