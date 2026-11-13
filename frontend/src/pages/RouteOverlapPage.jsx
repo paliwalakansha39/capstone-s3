@@ -33,6 +33,30 @@ import {
 
 const DELHI_CENTER = [28.6139, 77.209];
 
+// Custom icon generator for proposed waypoints (numbered blue circle)
+function createNumberedWaypointIcon(number, isTerminal = false) {
+  return L.divIcon({
+    className: "proposed-waypoint-marker",
+    html: `<div class="waypoint-badge ${isTerminal ? 'waypoint-badge-terminal' : ''}">${number}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
+function MapClickHandler({ onMapClick, drawingEnabled }) {
+  useMapEvents({
+    click(event) {
+      if (!drawingEnabled) return;
+      onMapClick({
+        latitude: parseFloat(event.latlng.lat.toFixed(6)),
+        longitude: parseFloat(event.latlng.lng.toFixed(6)),
+        id: `pt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+      });
+    }
+  });
+  return null;
+}
+
 function FitRouteBounds({ points }) {
   const map = useMap();
   useEffect(() => {
@@ -47,6 +71,22 @@ function FitRouteBounds({ points }) {
 
 export default function RouteOverlapPage() {
   const [mapCenter] = useState(DELHI_CENTER);
+  const [proposedPoints, setProposedPoints] = useState([]);
+  const [routeName, setRouteName] = useState("New Proposed Route");
+  const [drawingMode, setDrawingMode] = useState(true);
+
+  const handleAddPoint = useCallback((newPoint) => {
+    setProposedPoints((prev) => [...prev, newPoint]);
+  }, []);
+
+  const handleClearRoute = () => {
+    setProposedPoints([]);
+  };
+
+  const proposedPolylinePoints = useMemo(
+    () => proposedPoints.map((p) => [p.latitude, p.longitude]),
+    [proposedPoints]
+  );
 
   return (
     <section className="route-overlap-page">
@@ -58,23 +98,106 @@ export default function RouteOverlapPage() {
         </div>
       </div>
 
+      <div className="route-overlap-toolbar">
+        <div className="toolbar-group">
+          <label className="toolbar-label">
+            Route Name
+            <input
+              type="text"
+              className="input-text"
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+              placeholder="e.g. Kashmere Gate to Rohini Express"
+            />
+          </label>
+        </div>
+
+        <div className="toolbar-actions">
+          <button
+            type="button"
+            className={`button ${drawingMode ? "button-primary" : "button-outline"}`}
+            onClick={() => setDrawingMode((v) => !v)}
+          >
+            <Pencil size={15} />
+            {drawingMode ? "Drawing Active (Click Map)" : "Enable Drawing"}
+          </button>
+
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={handleClearRoute}
+            disabled={proposedPoints.length === 0}
+          >
+            <Trash2 size={15} />
+            Clear Route
+          </button>
+        </div>
+      </div>
+
       <div className="route-overlap-grid">
         <section className="content-card route-map-card">
           <div className="route-map-heading">
             <div>
               <span className="eyebrow">INTERACTIVE OVERLAP MAP</span>
               <h2>Transit Network Canvas</h2>
-              <p>Click on the map to add proposed route points, or inspect overlapping corridor segments.</p>
+              <p>
+                {proposedPoints.length === 0
+                  ? "Click on the map to plot the first waypoint of your proposed route."
+                  : `${proposedPoints.length} points plotted along proposed route.`}
+              </p>
+            </div>
+            <div className="map-badge-counter">
+              <span className="badge-blue">{proposedPoints.length} Waypoints</span>
             </div>
           </div>
+
           <div className="route-map" style={{ height: "550px" }}>
             <MapContainer center={mapCenter} zoom={11} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
-              <FitRouteBounds points={[]} />
+              <FitRouteBounds points={proposedPolylinePoints} />
+              <MapClickHandler onMapClick={handleAddPoint} drawingEnabled={drawingMode} />
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+
+              {/* Proposed Route Polyline - Color: BLUE (#2563eb) */}
+              {proposedPolylinePoints.length > 1 && (
+                <Polyline
+                  positions={proposedPolylinePoints}
+                  pathOptions={{
+                    color: "#2563eb",
+                    weight: 4,
+                    opacity: 0.9,
+                    dashArray: "6, 6"
+                  }}
+                />
+              )}
+
+              {/* Waypoint Markers */}
+              {proposedPoints.map((point, index) => {
+                const isTerminal = index === 0 || index === proposedPoints.length - 1;
+                return (
+                  <Marker
+                    key={point.id || index}
+                    position={[point.latitude, point.longitude]}
+                    icon={createNumberedWaypointIcon(index + 1, isTerminal)}
+                  >
+                    <Popup>
+                      <div className="waypoint-popup">
+                        <strong>Waypoint {index + 1}</strong>
+                        <p>{point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
             </MapContainer>
+
+            {proposedPoints.length === 0 && (
+              <div className="map-empty-hint">
+                Click anywhere on the map to start plotting waypoints for your proposed route.
+              </div>
+            )}
           </div>
         </section>
       </div>
