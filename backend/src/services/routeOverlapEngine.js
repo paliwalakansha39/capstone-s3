@@ -161,3 +161,25 @@ export function detectPartialOverlapsForRoute(proposedSegments, existingRoute, t
 
   return detectedOverlaps;
 }
+
+
+/**
+ * Calculates the percentage of the proposed route that overlaps with existing routes.
+ * 
+ * Formula:
+ * Overlap Percentage = (Overlapping Distance / Proposed Route Total Distance) * 100
+ * 
+ * Clamped strictly between 0.0 and 100.0.
+ * 
+ * @param {number} overlappingDistance Distance in meters or km
+ * @param {number} totalDistance Distance in same units
+ * @returns {number} Percentage between 0 and 100 rounded to 2 decimal places
+ */
+export function calculateOverlapPercentage(overlappingDistance, totalDistance) {
+  if (!totalDistance || totalDistance <= 0 || !overlappingDistance || overlappingDistance <= 0) {
+    return 0.0;
+  }
+  const ratio = (overlappingDistance / totalDistance) * 100.0;
+  const clamped = Math.max(0.0, Math.min(100.0, ratio));
+  return Math.round(clamped * 100) / 100;
+}
