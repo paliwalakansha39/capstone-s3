@@ -69,6 +69,30 @@ function FitRouteBounds({ points }) {
   return null;
 }
 
+function MapLegend() {
+  return (
+    <div className="map-legend-overlay">
+      <div className="legend-title">Route Visualization</div>
+      <div className="legend-item">
+        <span className="legend-bar legend-blue" />
+        <span>Proposed Route</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-bar legend-grey" />
+        <span>Existing Routes</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-bar legend-red" />
+        <span>Overlapping Sections</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-bar legend-green" />
+        <span>Non-Overlapping Sections</span>
+      </div>
+    </div>
+  );
+}
+
 export default function RouteOverlapPage() {
   const [mapCenter] = useState(DELHI_CENTER);
   const [proposedPoints, setProposedPoints] = useState([]);
@@ -78,6 +102,9 @@ export default function RouteOverlapPage() {
   const [showExistingRoutes, setShowExistingRoutes] = useState(true);
   const [selectedExistingRouteId, setSelectedExistingRouteId] = useState(null);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
+  const [toleranceMeters, setToleranceMeters] = useState(50);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   // Load existing routes
   useEffect(() => {
@@ -246,7 +273,7 @@ export default function RouteOverlapPage() {
               })}
 
               {/* Proposed Route Polyline - Color: BLUE (#2563eb) */}
-              {proposedPolylinePoints.length > 1 && (
+              {proposedPolylinePoints.length > 1 && !analysisResult && (
                 <Polyline
                   positions={proposedPolylinePoints}
                   pathOptions={{
@@ -257,6 +284,64 @@ export default function RouteOverlapPage() {
                   }}
                 />
               )}
+
+              {/* Non-Overlapping Sections - Color: GREEN (#10b981) */}
+              {analysisResult?.nonOverlappingPolylines?.map((poly, idx) => (
+                <Polyline
+                  key={`non-overlap-${idx}`}
+                  positions={poly.map((p) => [p.latitude, p.longitude])}
+                  pathOptions={{
+                    color: "#10b981",
+                    weight: 4,
+                    opacity: 0.95
+                  }}
+                >
+                  <Popup>
+                    <div className="overlap-popup">
+                      <span className="badge-green" style={{ display: "inline-block", marginBottom: "4px" }}>
+                        Unique Corridor
+                      </span>
+                      <p style={{ margin: "2px 0", fontSize: "12px", color: "#1e293b" }}>
+                        Non-overlapping proposed transit segment
+                      </p>
+                    </div>
+                  </Popup>
+                </Polyline>
+              ))}
+
+              {/* Overlapping Sections - Color: RED (#ef4444) */}
+              {analysisResult?.overlappingSegments?.map((seg, idx) => {
+                const coords = (seg.segmentCoordinates || []).map((p) => [p.latitude, p.longitude]);
+                if (coords.length < 2) return null;
+                return (
+                  <Polyline
+                    key={`overlap-${idx}`}
+                    positions={coords}
+                    pathOptions={{
+                      color: "#ef4444",
+                      weight: 6,
+                      opacity: 0.95
+                    }}
+                  >
+                    <Popup>
+                      <div className="overlap-popup">
+                        <span className="badge-red" style={{ display: "inline-block", marginBottom: "4px" }}>
+                          Overlapping Section
+                        </span>
+                        <h4 style={{ margin: "2px 0 4px", fontSize: "13px", color: "#b91c1c" }}>
+                          Route {seg.existingRouteNumber} &bull; {seg.existingRouteName}
+                        </h4>
+                        <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
+                          <strong>Overlap Distance:</strong> {(seg.overlapDistanceMeters / 1000).toFixed(2)} km ({seg.overlapDistanceMeters} m)
+                        </p>
+                        <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
+                          <strong>Impact:</strong> {seg.overlapPercentage.toFixed(1)}% of proposed route
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                );
+              })}
 
               {/* Waypoint Markers */}
               {proposedPoints.map((point, index) => {
@@ -304,6 +389,8 @@ export default function RouteOverlapPage() {
                 );
               })}
             </MapContainer>
+
+            <MapLegend />
 
             {proposedPoints.length === 0 && (
               <div className="map-empty-hint">
