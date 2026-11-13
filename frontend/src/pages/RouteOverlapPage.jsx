@@ -477,6 +477,9 @@ export default function RouteOverlapPage() {
         </div>
       </div>
 
+      {error && <div role="alert" className="form-alert">{error}</div>}
+      {notice && <div role="status" className="form-success">{notice}</div>}
+
       <div className="route-overlap-toolbar">
         <div className="toolbar-group">
           <label className="toolbar-label">
