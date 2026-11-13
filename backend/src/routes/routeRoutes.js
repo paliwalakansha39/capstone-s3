@@ -13,6 +13,8 @@ import {
   analyzeOverlapHandler,
   createProposedRouteHandler,
   deleteProposedRouteHandler,
+  getOverlapAnalysisHandler,
+  getOverlapHistoryHandler,
   getProposedRouteHandler,
   listProposedRoutesHandler
 } from "../controllers/routeOverlapController.js";
@@ -24,6 +26,8 @@ router.use(requireAdminAuth);
 
 // Chunk 8: Proposed Route & Overlap Analysis endpoints
 router.post("/analyze-overlap", analyzeOverlapHandler);
+router.get("/overlap-history", getOverlapHistoryHandler);
+router.get("/overlap/:id", getOverlapAnalysisHandler);
 router.get("/proposed", listProposedRoutesHandler);
 router.post("/proposed", createProposedRouteHandler);
 router.get("/proposed/:id", getProposedRouteHandler);
