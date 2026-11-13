@@ -55,6 +55,18 @@ This document tracks all project contributions across the three core academic su
   - `README.md`: Added comprehensive, step-by-step installation and setup guide detailing prerequisites, dual-database setup (PostgreSQL + SQLite), Prisma migration steps, and automated testing instructions.
   - `backend/src/server.js`: Added graceful database connection handling so backend services run reliably across varied development environments.
 
+---
+
+## Chunk 6: Linked Duty Scheduling (Phase 2 - Member 3)
+
+### Commit 1: Duty and DutyAssignment Database Models & Associations (Subject: DE)
+- **Files Created**:
+  - `backend/src/models/Duty.js`: Defined Sequelize model for `Duty` with fields: `dutyNumber`, `shiftType` (Morning, Evening, Full-Day, Night), `shiftDate`, `startTime`, `endTime`, `depot`, `totalDurationHours`, `status` (Scheduled, Active, Completed, Cancelled), and `schedulingType` (Linked).
+  - `backend/src/models/DutyAssignment.js`: Defined Sequelize model for `DutyAssignment` establishing linked crew-to-bus binding: `dutyId`, `busId`, `driverId`, `conductorId`, `vehicleHandoverVerified`, and `totalTripsCovered`.
+- **Files Modified**:
+  - `backend/src/models/index.js`: Registered `Duty` and `DutyAssignment` models and established 1:1 duty assignment, bus, driver, and conductor associations.
+
+
 
 
 
