@@ -237,3 +237,165 @@ export function calculateUniqueOverlappingDistance(intervals) {
   const merged = mergeOverlappingIntervals(intervals);
   return merged.reduce((acc, curr) => acc + curr.length, 0.0);
 }
+
+
+/**
+ * Extracts coordinates along a proposed polyline for a distance interval [dStart, dEnd].
+ * @param {Array<Object>} proposedSegments
+ * @param {number} dStart
+ * @param {number} dEnd
+ * @returns {Array<{latitude: number, longitude: number}>}
+ */
+export function extractPolylineSubsegment(proposedSegments, dStart, dEnd) {
+  const points = [];
+  for (const seg of proposedSegments) {
+    if (seg.cumulativeEnd < dStart || seg.cumulativeStart > dEnd) {
+      continue;
+    }
+    const segStartT = Math.max(0, Math.min(1, (dStart - seg.cumulativeStart) / seg.length));
+    const segEndT = Math.max(0, Math.min(1, (dEnd - seg.cumulativeStart) / seg.length));
+
+    if (points.length === 0) {
+      points.push(interpolatePoint(seg.start, seg.end, segStartT));
+    }
+    if (segEndT > segStartT) {
+      points.push(interpolatePoint(seg.start, seg.end, segEndT));
+    }
+  }
+  return points;
+}
+
+/**
+ * Computes the complement (non-overlapping) intervals given the merged overlapping intervals.
+ * @param {number} totalDistance
+ * @param {Array<{start: number, end: number}>} mergedOverlaps
+ * @returns {Array<{start: number, end: number, length: number}>}
+ */
+export function computeNonOverlappingIntervals(totalDistance, mergedOverlaps) {
+  if (totalDistance <= 0) return [];
+  if (!mergedOverlaps || mergedOverlaps.length === 0) {
+    return [{ start: 0, end: totalDistance, length: totalDistance }];
+  }
+
+  const nonOverlaps = [];
+  let cursor = 0.0;
+
+  for (const interval of mergedOverlaps) {
+    if (interval.start > cursor + 1.0) {
+      nonOverlaps.push({
+        start: cursor,
+        end: interval.start,
+        length: interval.start - cursor
+      });
+    }
+    cursor = Math.max(cursor, interval.end);
+  }
+
+  if (cursor < totalDistance - 1.0) {
+    nonOverlaps.push({
+      start: cursor,
+      end: totalDistance,
+      length: totalDistance - cursor
+    });
+  }
+
+  return nonOverlaps;
+}
+
+/**
+ * Executes the complete geographical route overlap analysis against an array of existing routes.
+ * 
+ * @param {Array<{latitude: number, longitude: number}>} coordinates Proposed route waypoints
+ * @param {Array<Object>} existingRoutes Array of existing Route models with populated stops
+ * @param {number} toleranceInput Overlap tolerance in meters
+ * @returns {Object} Full analysis result
+ */
+export function executeRouteOverlapAnalysis(coordinates, existingRoutes = [], toleranceInput = 50.0) {
+  const validation = validateRouteCoordinates(coordinates);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const toleranceMeters = resolveToleranceMeters(toleranceInput);
+  const totalDistanceMeters = calculatePolylineDistance(coordinates);
+  const proposedSegments = buildRouteSegments(coordinates);
+
+  const allDetectedOverlaps = [];
+  const perRouteMap = new Map();
+
+  for (const route of existingRoutes) {
+    const routeOverlaps = detectPartialOverlapsForRoute(proposedSegments, route, toleranceMeters);
+    if (routeOverlaps.length > 0) {
+      allDetectedOverlaps.push(...routeOverlaps);
+
+      // Consolidate per-route overlap distance
+      const routeIntervals = routeOverlaps.map((o) => ({
+        globalStartDist: o.globalStartDist,
+        globalEndDist: o.globalEndDist
+      }));
+      const mergedForRoute = mergeOverlappingIntervals(routeIntervals);
+      const routeOverlapDist = mergedForRoute.reduce((sum, item) => sum + item.length, 0.0);
+      const routeOverlapPct = calculateOverlapPercentage(routeOverlapDist, totalDistanceMeters);
+
+      perRouteMap.set(route.id, {
+        existingRouteId: route.id,
+        existingRouteNumber: route.routeNumber,
+        existingRouteName: route.routeName,
+        startingPoint: route.startingPoint,
+        destination: route.destination,
+        totalDistanceKm: route.totalDistance,
+        overlapDistanceMeters: Math.round(routeOverlapDist * 10) / 10,
+        overlapDistanceKm: Math.round((routeOverlapDist / 1000.0) * 100) / 100,
+        overlapPercentage: routeOverlapPct,
+        segments: routeOverlaps.map((o) => ({
+          overlapDistanceMeters: Math.round(o.overlapDistance * 10) / 10,
+          startPoint: o.startPoint,
+          endPoint: o.endPoint,
+          coordinates: o.coordinates
+        }))
+      });
+    }
+  }
+
+  // 1D Interval Union to calculate true unique overlapping distance
+  const allIntervals = allDetectedOverlaps.map((o) => ({
+    globalStartDist: o.globalStartDist,
+    globalEndDist: o.globalEndDist
+  }));
+  const mergedOverlaps = mergeOverlappingIntervals(allIntervals);
+  const totalOverlappingDistanceMeters = mergedOverlaps.reduce((sum, item) => sum + item.length, 0.0);
+  const overallOverlapPercentage = calculateOverlapPercentage(totalOverlappingDistanceMeters, totalDistanceMeters);
+
+  // Generate overlapping coordinate polylines for map visualization (Red)
+  const overlappingPolylines = mergedOverlaps.map((interval) =>
+    extractPolylineSubsegment(proposedSegments, interval.start, interval.end)
+  ).filter((pts) => pts.length >= 2);
+
+  // Generate non-overlapping coordinate polylines for map visualization (Green)
+  const nonOverlappingIntervals = computeNonOverlappingIntervals(totalDistanceMeters, mergedOverlaps);
+  const nonOverlappingPolylines = nonOverlappingIntervals.map((interval) =>
+    extractPolylineSubsegment(proposedSegments, interval.start, interval.end)
+  ).filter((pts) => pts.length >= 2);
+
+  return {
+    toleranceMeters,
+    proposedTotalDistanceMeters: Math.round(totalDistanceMeters * 10) / 10,
+    proposedTotalDistanceKm: Math.round((totalDistanceMeters / 1000.0) * 100) / 100,
+    overlappingDistanceMeters: Math.round(totalOverlappingDistanceMeters * 10) / 10,
+    overlappingDistanceKm: Math.round((totalOverlappingDistanceMeters / 1000.0) * 100) / 100,
+    overlapPercentage: overallOverlapPercentage,
+    overlappingPolylines,
+    nonOverlappingPolylines,
+    affectedRoutes: Array.from(perRouteMap.values()).sort((a, b) => b.overlapDistanceMeters - a.overlapDistanceMeters),
+    overlappingSegments: allDetectedOverlaps.map((seg) => ({
+      existingRouteId: seg.existingRouteId,
+      existingRouteNumber: seg.existingRouteNumber,
+      existingRouteName: seg.existingRouteName,
+      overlapDistanceMeters: Math.round(seg.overlapDistance * 10) / 10,
+      overlapPercentage: calculateOverlapPercentage(seg.overlapDistance, totalDistanceMeters),
+      startPoint: seg.startPoint,
+      endPoint: seg.endPoint,
+      segmentCoordinates: seg.coordinates
+    }))
+  };
+}
