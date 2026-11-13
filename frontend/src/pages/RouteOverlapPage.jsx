@@ -74,6 +74,32 @@ export default function RouteOverlapPage() {
   const [proposedPoints, setProposedPoints] = useState([]);
   const [routeName, setRouteName] = useState("New Proposed Route");
   const [drawingMode, setDrawingMode] = useState(true);
+  const [existingRoutes, setExistingRoutes] = useState([]);
+  const [showExistingRoutes, setShowExistingRoutes] = useState(true);
+  const [selectedExistingRouteId, setSelectedExistingRouteId] = useState(null);
+  const [loadingRoutes, setLoadingRoutes] = useState(true);
+
+  // Load existing routes
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchRoutes() {
+      try {
+        setLoadingRoutes(true);
+        const data = await getRoutes();
+        if (isMounted) {
+          setExistingRoutes(data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load existing routes:", err);
+      } finally {
+        if (isMounted) setLoadingRoutes(false);
+      }
+    }
+    fetchRoutes();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleUpdatePoint = useCallback((index, updatedFields) => {
     setProposedPoints((prev) =>
@@ -129,11 +155,21 @@ export default function RouteOverlapPage() {
         <div className="toolbar-actions">
           <button
             type="button"
+            className={`button ${showExistingRoutes ? "button-primary" : "button-outline"}`}
+            onClick={() => setShowExistingRoutes((v) => !v)}
+            title="Toggle existing DTC network routes visibility"
+          >
+            <Layers size={15} />
+            {showExistingRoutes ? `Existing Routes (${existingRoutes.length})` : "Show Existing Routes"}
+          </button>
+
+          <button
+            type="button"
             className={`button ${drawingMode ? "button-primary" : "button-outline"}`}
             onClick={() => setDrawingMode((v) => !v)}
           >
             <Pencil size={15} />
-            {drawingMode ? "Drawing Active (Click Map)" : "Enable Drawing"}
+            {drawingMode ? "Drawing Active" : "Enable Drawing"}
           </button>
 
           <button
@@ -173,6 +209,41 @@ export default function RouteOverlapPage() {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+
+              {/* Existing Routes - Color: GREY (#94a3b8) */}
+              {showExistingRoutes && existingRoutes.map((route) => {
+                const stops = route.stops || [];
+                if (stops.length < 2) return null;
+                const positions = stops.map((s) => [s.latitude, s.longitude]);
+                const isSelected = selectedExistingRouteId === route.id;
+
+                return (
+                  <Polyline
+                    key={route.id}
+                    positions={positions}
+                    pathOptions={{
+                      color: isSelected ? "#475569" : "#94a3b8",
+                      weight: isSelected ? 4 : 3,
+                      opacity: isSelected ? 0.95 : 0.75
+                    }}
+                  >
+                    <Popup>
+                      <div className="route-popup">
+                        <span className="badge-grey" style={{ display: "inline-block", marginBottom: "4px" }}>
+                          Route {route.routeNumber}
+                        </span>
+                        <h4 style={{ margin: "2px 0 6px", fontSize: "14px", color: "#1e293b" }}>{route.routeName}</h4>
+                        <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
+                          <strong>Path:</strong> {route.startingPoint} &rarr; {route.destination}
+                        </p>
+                        <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
+                          <strong>Distance:</strong> {route.totalDistance} km &bull; {stops.length} stops
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                );
+              })}
 
               {/* Proposed Route Polyline - Color: BLUE (#2563eb) */}
               {proposedPolylinePoints.length > 1 && (
