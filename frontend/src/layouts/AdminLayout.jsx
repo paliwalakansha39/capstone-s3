@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronRight,
   CircleUserRound,
+  Layers,
   LayoutDashboard,
   LogOut,
   Map,
@@ -23,6 +24,7 @@ const links = [
   { to: "/admin/buses", label: "Bus Management", icon: BusFront },
   { to: "/admin/crew", label: "Crew Management", icon: UserCheck },
   { to: "/admin/routes", label: "Route Management", icon: Map },
+  { to: "/admin/route-overlap", label: "Route Overlap", icon: Layers },
   { to: "/admin/trips", label: "Trip Management", icon: CalendarDays },
   { to: "/admin/duties", label: "Duty Scheduling", icon: CalendarCheck }
 ];

@@ -14,6 +14,7 @@ import CrewManagementPage from "./pages/CrewManagementPage";
 import TripManagementPage from "./pages/TripManagementPage";
 import DutySchedulingPage from "./pages/DutySchedulingPage";
 const RouteManagementPage = lazy(() => import("./pages/RouteManagementPage"));
+const RouteOverlapPage = lazy(() => import("./pages/RouteOverlapPage"));
 
 export default function App() {
   const { admin, login, logout, loading } = useAuth();
@@ -30,6 +31,8 @@ export default function App() {
       <Route path="crew" element={<CrewManagementPage />} />
       <Route path="trips" element={<TripManagementPage />} />
       <Route path="routes" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading route management...</main>}><RouteManagementPage /></Suspense>} />
+      {/* Chunk 8: Route Overlap Detection */}
+      <Route path="route-overlap" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading overlap detection...</main>}><RouteOverlapPage /></Suspense>} />
       {/* Chunk 6: Linked Duty Scheduling */}
       <Route path="duties" element={<DutySchedulingPage />} />
     </Route>
