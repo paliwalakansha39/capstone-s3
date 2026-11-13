@@ -64,3 +64,100 @@ export function validateRouteCoordinates(coordinates) {
   }
   return { valid: true };
 }
+
+
+import {
+  calculatePolylineDistance,
+  haversineDistance,
+  interpolatePoint
+} from "./geoDistance.js";
+import { compareSegments } from "./routeSegmentComparator.js";
+
+/**
+ * Breaks a route coordinate array into ordered linear segments with precalculated cumulative distances.
+ * @param {Array<{latitude: number, longitude: number}>} coordinates
+ * @returns {Array<{ start: Object, end: Object, length: number, cumulativeStart: number, cumulativeEnd: number }>}
+ */
+export function buildRouteSegments(coordinates) {
+  const segments = [];
+  let cumulative = 0.0;
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const start = coordinates[i];
+    const end = coordinates[i + 1];
+    const length = haversineDistance(start.latitude, start.longitude, end.latitude, end.longitude);
+    segments.push({
+      index: i,
+      start,
+      end,
+      length,
+      cumulativeStart: cumulative,
+      cumulativeEnd: cumulative + length
+    });
+    cumulative += length;
+  }
+  return segments;
+}
+
+/**
+ * Detects partial and full overlapping sections between proposed route segments and an existing route.
+ * @param {Array<Object>} proposedSegments
+ * @param {Object} existingRoute
+ * @param {number} toleranceMeters
+ * @returns {Array<Object>} List of overlapping segments for this existing route
+ */
+export function detectPartialOverlapsForRoute(proposedSegments, existingRoute, toleranceMeters = 50.0) {
+  const existingStops = existingRoute.stops || [];
+  if (existingStops.length < 2) return [];
+
+  const existingSegments = buildRouteSegments(existingStops);
+  const sampleStep = getAdaptiveSampleStep(toleranceMeters);
+  const detectedOverlaps = [];
+
+  for (const pSeg of proposedSegments) {
+    if (pSeg.length === 0) continue;
+
+    for (const eSeg of existingSegments) {
+      if (eSeg.length === 0) continue;
+
+      const matches = compareSegments(
+        pSeg.start,
+        pSeg.end,
+        eSeg.start,
+        eSeg.end,
+        toleranceMeters,
+        sampleStep
+      );
+
+      for (const match of matches) {
+        const segOverlapDist = pSeg.length * (match.endT - match.startT);
+        if (segOverlapDist < MIN_CORRIDOR_OVERLAP_METERS && (match.endT - match.startT) < 0.99) {
+          // Ignore negligible transient contacts under 30 meters unless it's nearly the full segment
+          continue;
+        }
+
+        const startCoord = interpolatePoint(pSeg.start, pSeg.end, match.startT);
+        const endCoord = interpolatePoint(pSeg.start, pSeg.end, match.endT);
+
+        const globalStartDist = pSeg.cumulativeStart + match.startT * pSeg.length;
+        const globalEndDist = pSeg.cumulativeStart + match.endT * pSeg.length;
+
+        detectedOverlaps.push({
+          existingRouteId: existingRoute.id,
+          existingRouteNumber: existingRoute.routeNumber,
+          existingRouteName: existingRoute.routeName,
+          proposedSegmentIndex: pSeg.index,
+          startT: match.startT,
+          endT: match.endT,
+          globalStartDist,
+          globalEndDist,
+          overlapDistance: segOverlapDist,
+          startPoint: startCoord,
+          endPoint: endCoord,
+          coordinates: match.points.length >= 2 ? match.points : [startCoord, endCoord]
+        });
+      }
+    }
+  }
+
+  return detectedOverlaps;
+}
