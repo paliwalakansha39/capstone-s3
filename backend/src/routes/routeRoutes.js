@@ -10,6 +10,7 @@ import {
   updateStop
 } from "../controllers/routeController.js";
 import {
+  analyzeOverlapHandler,
   createProposedRouteHandler,
   deleteProposedRouteHandler,
   getProposedRouteHandler,
@@ -21,7 +22,8 @@ const router = Router();
 
 router.use(requireAdminAuth);
 
-// Chunk 8: Proposed Route endpoints
+// Chunk 8: Proposed Route & Overlap Analysis endpoints
+router.post("/analyze-overlap", analyzeOverlapHandler);
 router.get("/proposed", listProposedRoutesHandler);
 router.post("/proposed", createProposedRouteHandler);
 router.get("/proposed/:id", getProposedRouteHandler);
