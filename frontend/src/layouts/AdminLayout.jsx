@@ -1,6 +1,6 @@
 import {
-  Activity,
   BusFront,
+  CalendarCheck,
   CalendarDays,
   ChevronRight,
   CircleUserRound,
@@ -24,7 +24,7 @@ const links = [
   { to: "/admin/crew", label: "Crew Management", icon: UserCheck },
   { to: "/admin/routes", label: "Route Management", icon: Map },
   { to: "/admin/trips", label: "Trip Management", icon: CalendarDays },
-  { to: "/admin/duties", label: "Duty Scheduling", icon: Activity }
+  { to: "/admin/duties", label: "Duty Scheduling", icon: CalendarCheck }
 ];
 
 export default function AdminLayout({ admin, logout, context }) {

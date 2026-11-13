@@ -98,6 +98,18 @@ This document tracks all project contributions across the three core academic su
   - `backend/src/services/dutySchedulerEngine.js`: Refined automated scheduling engine database operations for resilient concurrency.
   - Test validation: 71/71 tests passing across all 6 test suites.
 
+### Commit 6: Frontend Duty API Service & Admin Navigation Routing (Subject: ISD)
+- **Files Created**:
+  - `frontend/src/services/dutyService.js`: Implemented client API service interfacing with backend Duty Management REST endpoints:
+    - `getDuties`: Supports pagination and multi-parameter filtering (search, shiftType, shiftDate, depot, status, busId).
+    - `getDutyStats`: Fetches real-time duty status counts and linked fleet bindings.
+    - `getDutyById`: Fetches duty shift details with associated bus, driver, and conductor assignments.
+    - `generateLinkedDuties`: Calls automated linked duty generation engine.
+    - `createDuty`, `updateDuty`, `deleteDuty`: Full CRUD operations.
+- **Files Modified**:
+  - `frontend/src/App.jsx`: Registered administrative `/admin/duties` routing.
+  - `frontend/src/layouts/AdminLayout.jsx`: Configured sidebar navigation link with dedicated `CalendarCheck` icon and active navigation indicators.
+
 
 
 

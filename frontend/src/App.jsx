@@ -29,6 +29,7 @@ export default function App() {
       <Route path="crew" element={<CrewManagementPage />} />
       <Route path="trips" element={<TripManagementPage />} />
       <Route path="routes" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading route management...</main>}><RouteManagementPage /></Suspense>} />
+      {/* Chunk 6: Linked Duty Scheduling */}
       <Route path="duties" element={<PlaceholderPage title="Duty Scheduling" />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
