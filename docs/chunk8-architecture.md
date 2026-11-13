@@ -58,3 +58,46 @@ Chunk 8 introduces the ability for administrators to draw proposed routes and de
   - **Existing Routes**: Grey (`#94a3b8`, weight 3, opacity 0.7).
   - **Overlapping Sections**: Red (`#ef4444`, weight 6, opacity 0.95).
   - **Non-Overlapping Sections**: Green (`#10b981`, weight 4, opacity 0.9).
+
+
+## 3. Chunk 8 Implementation Structure
+
+### 3.1 Subject-Wise Component Breakdown
+
+#### A. Information Systems Design (ISD) — Frontend
+- **Route Overlap Detection Page (`frontend/src/pages/RouteOverlapPage.jsx`)**:
+  - Interactive map canvas supporting click-to-add waypoint, marker drag-to-edit, and right-click or popup point deletion.
+  - Layer controls for toggling existing routes and proposed routes.
+  - Multi-colored path renderer: Proposed (Blue), Existing (Grey), Overlaps (Red), Non-overlapping (Green).
+  - Analytical Results Panel displaying total proposed distance, overlapping distance, unique overlap percentage, list of affected existing routes, and route comparison metrics.
+  - Analysis History Drawer for inspecting and loading previous evaluations.
+  - Action controls: "Draw Route", "Add Point", "Clear Route", "Analyze Overlap", "Save Proposed Route".
+- **API Client Service (`frontend/src/services/routeOverlapService.js`)**:
+  - `analyzeRouteOverlap(payload)`
+  - `saveProposedRoute(payload)`
+  - `getProposedRoutes()`
+  - `getOverlapAnalysis(id)`
+  - `getOverlapHistory()`
+  - `deleteProposedRoute(id)`
+
+#### B. Advanced Software Design (ASD) — Backend
+- **Geographical Calculation Engine (`backend/src/services/geoDistance.js`)**:
+  - Haversine great-circle distance computation.
+  - Point-to-segment projection and cross-track distance.
+  - Angular alignment detection to separate corridor overlaps from perpendicular/crossing intersections.
+- **Route Overlap Detection Algorithm (`backend/src/services/routeOverlapEngine.js`)**:
+  - Configurable tolerance $\epsilon$ in meters (default 50m).
+  - Subsegment interpolation and corridor sampling.
+  - Direction-independent overlap detection (bi-directional transit corridors).
+  - 1D interval union algorithm for duplicate overlap prevention across multiple overlapping routes.
+  - Overlap percentage formula:
+    $$\text{Overlap Percentage} = \min\left(100, \max\left(0, \frac{\text{Overlapping Distance}}{\text{Proposed Total Distance}} \times 100\right)\right)$$
+- **Controllers and Routers (`backend/src/controllers/routeOverlapController.js`, `backend/src/routes/routeOverlapRoutes.js`)**:
+  - Full input validation (handling empty routes, malformed coordinates, out-of-range lat/long).
+  - Admin JWT authentication via `requireAdminAuth`.
+
+#### C. Database Engineering (DE) — Schema & Migrations
+- **Proposed Routes Model (`proposed_routes`)**: Stores proposed route drafts with metadata.
+- **Proposed Route Coordinates Model (`proposed_route_coordinates`)**: Ordered coordinates with sequence index.
+- **Route Overlap Analysis Model (`route_overlap_analyses`)**: Historical analysis records with metrics and admin reference.
+- **Overlapping Route Segments Model (`overlapping_route_segments`)**: Extracted overlapping sections with JSON coordinate sequences.
