@@ -18,18 +18,6 @@ export function makeDutyInterval(shiftDate, startTime, endTime) {
   if (!validTime(startTime) || !validTime(endTime) || startTime === endTime) {
     return { error: "startTime and endTime must be different valid HH:mm times." };
   }
-
-  export function isValidDate(value) {
-    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
-      && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
-      && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
-  }
-
-  export function localDateBoundary(date, endOfDay = false) {
-    if (!isValidDate(date)) return null;
-    return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+05:30`);
-  }
-
   const start = localDateTimeToUTC(shiftDate, startTime);
   let end = localDateTimeToUTC(shiftDate, endTime);
   if (end <= start) end = new Date(end.getTime() + DAY_MS);
@@ -38,6 +26,17 @@ export function makeDutyInterval(shiftDate, startTime, endTime) {
     return { error: "A duty must be between 30 minutes and 8 hours." };
   }
   return { start, end, durationMinutes };
+}
+
+export function isValidDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+}
+
+export function localDateBoundary(date, endOfDay = false) {
+  if (!isValidDate(date)) return null;
+  return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+05:30`);
 }
 
 function validTime(value) {
