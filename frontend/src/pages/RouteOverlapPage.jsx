@@ -98,12 +98,12 @@ function OverlapResultsPanel({ analysisResult, onSelectRoute }) {
   if (!analysisResult) return null;
 
   const {
-    proposedTotalDistanceKm,
-    overlappingDistanceKm,
-    overlapPercentage,
+    proposedTotalDistanceKm = 0,
+    overlappingDistanceKm = 0,
+    overlapPercentage = 0,
     affectedRoutes = [],
     overlappingSegments = [],
-    toleranceMeters
+    toleranceMeters = DEFAULT_TOLERANCE_METERS
   } = analysisResult;
 
   const overlapSeverity =
@@ -124,32 +124,36 @@ function OverlapResultsPanel({ analysisResult, onSelectRoute }) {
 
         <div className={`severity-pill severity-${overlapSeverity}`}>
           <span className="dot" />
-          {overlapPercentage}% Network Overlap
+          {typeof overlapPercentage === "number" ? overlapPercentage.toFixed(1) : overlapPercentage}% Network Overlap
         </div>
       </div>
 
       <div className="kpi-grid">
         <div className="kpi-card">
           <span className="kpi-label">Proposed Total Distance</span>
-          <strong className="kpi-value">{proposedTotalDistanceKm} <small>km</small></strong>
+          <strong className="kpi-value">
+            {typeof proposedTotalDistanceKm === "number" ? proposedTotalDistanceKm.toFixed(2) : proposedTotalDistanceKm} <small>km</small>
+          </strong>
           <span className="kpi-sub">Calculated via Haversine</span>
         </div>
 
         <div className="kpi-card">
           <span className="kpi-label">Overlapping Distance</span>
-          <strong className="kpi-value text-danger">{overlappingDistanceKm} <small>km</small></strong>
+          <strong className="kpi-value text-danger">
+            {typeof overlappingDistanceKm === "number" ? overlappingDistanceKm.toFixed(2) : overlappingDistanceKm} <small>km</small>
+          </strong>
           <span className="kpi-sub">Shared transit corridor</span>
         </div>
 
         <div className="kpi-card">
           <span className="kpi-label">Overlap Ratio</span>
           <strong className={`kpi-value ${overlapSeverity === 'high' ? 'text-danger' : overlapSeverity === 'moderate' ? 'text-warning' : 'text-success'}`}>
-            {overlapPercentage}%
+            {typeof overlapPercentage === "number" ? overlapPercentage.toFixed(1) : overlapPercentage}%
           </strong>
           <div className="overlap-progress-bar">
             <div
               className={`progress-fill progress-${overlapSeverity}`}
-              style={{ width: `${Math.min(100, overlapPercentage)}%` }}
+              style={{ width: `${Math.min(100, Math.max(0, Number(overlapPercentage) || 0))}%` }}
             />
           </div>
         </div>
@@ -190,10 +194,10 @@ function OverlapResultsPanel({ analysisResult, onSelectRoute }) {
                 </div>
                 <div className="route-metrics-col">
                   <span className="metric-item">
-                    <strong>{route.overlapDistanceKm} km</strong> overlap
+                    <strong>{typeof route.overlapDistanceKm === "number" ? route.overlapDistanceKm.toFixed(2) : route.overlapDistanceKm} km</strong> overlap
                   </span>
                   <span className="metric-item text-secondary">
-                    {route.overlapPercentage}% of proposed
+                    {typeof route.overlapPercentage === "number" ? route.overlapPercentage.toFixed(1) : route.overlapPercentage}% of proposed
                   </span>
                 </div>
                 <div className="route-action-col">
@@ -350,6 +354,10 @@ export default function RouteOverlapPage() {
     };
   }, []);
 
+  const handleAddPoint = useCallback((point) => {
+    setProposedPoints((prev) => [...prev, point]);
+  }, []);
+
   const handleUpdatePoint = useCallback((index, updatedFields) => {
     setProposedPoints((prev) =>
       prev.map((p, idx) => (idx === index ? { ...p, ...updatedFields } : p))
@@ -370,6 +378,8 @@ export default function RouteOverlapPage() {
 
   const handleClearRoute = () => {
     setProposedPoints([]);
+    setAnalysisResult(null);
+    setSelectedExistingRouteId(null);
   };
 
   const proposedPolylinePoints = useMemo(
@@ -455,7 +465,7 @@ export default function RouteOverlapPage() {
             title="Toggle existing DTC network routes visibility"
           >
             <Layers size={15} />
-            {showExistingRoutes ? `Existing Routes (${existingRoutes.length})` : "Show Routes"}
+            {showExistingRoutes ? (loadingRoutes ? "Loading Routes..." : `Existing Routes (${existingRoutes.length})`) : "Show Routes"}
           </button>
 
           <button
@@ -541,7 +551,7 @@ export default function RouteOverlapPage() {
               })}
 
               {/* Proposed Route Polyline - Color: BLUE (#2563eb) */}
-              {proposedPolylinePoints.length > 1 && !analysisResult && (
+              {proposedPolylinePoints.length > 1 && (!analysisResult || !analysisResult.nonOverlappingPolylines?.length) && (
                 <Polyline
                   positions={proposedPolylinePoints}
                   pathOptions={{
@@ -554,33 +564,41 @@ export default function RouteOverlapPage() {
               )}
 
               {/* Non-Overlapping Sections - Color: GREEN (#10b981) */}
-              {analysisResult?.nonOverlappingPolylines?.map((poly, idx) => (
-                <Polyline
-                  key={`non-overlap-${idx}`}
-                  positions={poly.map((p) => [p.latitude, p.longitude])}
-                  pathOptions={{
-                    color: "#10b981",
-                    weight: 4,
-                    opacity: 0.95
-                  }}
-                >
-                  <Popup>
-                    <div className="overlap-popup">
-                      <span className="badge-green" style={{ display: "inline-block", marginBottom: "4px" }}>
-                        Unique Corridor
-                      </span>
-                      <p style={{ margin: "2px 0", fontSize: "12px", color: "#1e293b" }}>
-                        Non-overlapping proposed transit segment
-                      </p>
-                    </div>
-                  </Popup>
-                </Polyline>
-              ))}
+              {analysisResult?.nonOverlappingPolylines?.map((poly, idx) => {
+                const coords = (poly || []).map((p) => [p.latitude ?? p[0], p.longitude ?? p[1]]);
+                if (coords.length < 2) return null;
+                return (
+                  <Polyline
+                    key={`non-overlap-${idx}`}
+                    positions={coords}
+                    pathOptions={{
+                      color: "#10b981",
+                      weight: 4,
+                      opacity: 0.95
+                    }}
+                  >
+                    <Popup>
+                      <div className="overlap-popup">
+                        <span className="badge-green" style={{ display: "inline-block", marginBottom: "4px" }}>
+                          Unique Corridor
+                        </span>
+                        <p style={{ margin: "2px 0", fontSize: "12px", color: "#1e293b" }}>
+                          Non-overlapping proposed transit segment
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                );
+              })}
 
               {/* Overlapping Sections - Color: RED (#ef4444) */}
               {analysisResult?.overlappingSegments?.map((seg, idx) => {
-                const coords = (seg.segmentCoordinates || []).map((p) => [p.latitude, p.longitude]);
+                const coords = (seg.segmentCoordinates || []).map((p) => [p.latitude ?? p[0], p.longitude ?? p[1]]);
                 if (coords.length < 2) return null;
+                const distMeters = seg.overlapDistanceMeters ?? seg.overlapDistance ?? 0;
+                const distKm = (distMeters / 1000).toFixed(2);
+                const impact = typeof seg.overlapPercentage === "number" ? seg.overlapPercentage.toFixed(1) : seg.overlapPercentage;
+
                 return (
                   <Polyline
                     key={`overlap-${idx}`}
@@ -600,10 +618,10 @@ export default function RouteOverlapPage() {
                           Route {seg.existingRouteNumber} &bull; {seg.existingRouteName}
                         </h4>
                         <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
-                          <strong>Overlap Distance:</strong> {(seg.overlapDistanceMeters / 1000).toFixed(2)} km ({seg.overlapDistanceMeters} m)
+                          <strong>Overlap Distance:</strong> {distKm} km ({distMeters} m)
                         </p>
                         <p style={{ margin: "2px 0", fontSize: "12px", color: "#475569" }}>
-                          <strong>Impact:</strong> {seg.overlapPercentage.toFixed(1)}% of proposed route
+                          <strong>Impact:</strong> {impact}% of proposed route
                         </p>
                       </div>
                     </Popup>
