@@ -120,13 +120,43 @@ export async function getCrewAvailabilityCalendar(req, res, next) {
       }
     });
 
+    const assignments = crew.flatMap(({ crewAssignments, ...member }) =>
+      crewAssignments.map((assignment) => ({ ...assignment, crew: member })));
+    const restPeriods = crew.flatMap(({ restPeriods: memberRestPeriods, ...member }) =>
+      memberRestPeriods.map((restPeriod) => ({ ...restPeriod, crew: member })));
+    const overlaps = new Map();
+    const byCrew = new Map();
+    for (const assignment of assignments) {
+      const crewAssignments = byCrew.get(assignment.crewId) || [];
+      crewAssignments.push(assignment);
+      byCrew.set(assignment.crewId, crewAssignments);
+    }
+    for (const crewAssignments of byCrew.values()) {
+      for (let index = 0; index < crewAssignments.length; index += 1) {
+        for (let nextIndex = index + 1; nextIndex < crewAssignments.length; nextIndex += 1) {
+          const current = crewAssignments[index];
+          const next = crewAssignments[nextIndex];
+          if (current.assignmentStartTime < next.assignmentEndTime
+            && next.assignmentStartTime < current.assignmentEndTime) {
+            overlaps.set(current.id, [...(overlaps.get(current.id) || []), next.dutyId]);
+            overlaps.set(next.id, [...(overlaps.get(next.id) || []), current.dutyId]);
+          }
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      data: crew.map(({ crewAssignments, restPeriods, ...member }) => ({
-        ...member,
-        assignments: crewAssignments,
+      data: {
+        startDate,
+        endDate,
+        assignments: assignments.map((assignment) => ({
+          ...assignment,
+          hasOverlap: overlaps.has(assignment.id),
+          overlappingDutyIds: overlaps.get(assignment.id) || []
+        })),
         restPeriods
-      })),
+      },
       meta: { startDate, endDate }
     });
   } catch (error) {

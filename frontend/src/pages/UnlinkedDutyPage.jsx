@@ -58,6 +58,12 @@ function addCalendarDay(date) {
   return next.toISOString().slice(0, 10);
 }
 
+function addCalendarDays(date, days) {
+  const endDate = new Date(`${date}T00:00:00Z`);
+  endDate.setUTCDate(endDate.getUTCDate() + days);
+  return endDate.toISOString().slice(0, 10);
+}
+
 function displayDate(value) {
   return value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 }
@@ -108,9 +114,7 @@ export default function UnlinkedDutyPage() {
     setIsLoading(true);
     setError("");
     try {
-      const endDate = new Date(`${calendarStart}T12:00:00+05:30`);
-      endDate.setDate(endDate.getDate() + 6);
-      const end = getIndiaDateTime(endDate.getTime() - Date.now()).date;
+      const end = addCalendarDays(calendarStart, 6);
       const [scheduleResult, dutyResult, busResult, crewResult, handoverResult, restConfig, calendarResult] = await Promise.all([
         getUnlinkedSchedules(),
         getDuties({ page: 1, limit: 100 }),
@@ -162,7 +166,7 @@ export default function UnlinkedDutyPage() {
     } catch (requestError) {
       setError(requestError.message || "Unable to check crew availability.");
     }
-  }, [availabilityAt.shiftDate, availabilityAt.startTime]);
+  }, [availabilityAt.shiftDate, availabilityAt.startTime, availabilityAt.endTime]);
 
   useEffect(() => {
     refreshAvailability();

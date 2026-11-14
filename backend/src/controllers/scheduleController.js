@@ -5,7 +5,6 @@ import {
   createDutyWithCrew,
   getRequiredRestMinutes,
   isValidDate,
-  localDateBoundary,
   makeDutyInterval,
   statusError
 } from "../services/unlinkedDutyService.js";
@@ -124,74 +123,6 @@ export async function createUnlinkedSchedule(req, res, next) {
       return res.status(409).json({ success: false, error: "Schedule changed during assignment. Refresh and retry." });
     }
     if (error.statusCode) return res.status(error.statusCode).json(statusError(error));
-    return next(error);
-  }
-}
-
-export async function getAvailabilityCalendar(req, res, next) {
-  try {
-    const startDate = typeof req.query.startDate === "string" ? req.query.startDate : new Date().toISOString().slice(0, 10);
-    const endDate = typeof req.query.endDate === "string"
-      ? req.query.endDate
-      : new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
-    const start = localDateBoundary(startDate);
-    const endDay = localDateBoundary(endDate, true);
-    if (!start || !endDay || endDay <= start) {
-      return res.status(400).json({ success: false, error: "Provide valid startDate and endDate values in YYYY-MM-DD format." });
-    }
-
-    const [assignments, restPeriods] = await Promise.all([
-      prisma.crewAssignment.findMany({
-        where: {
-          assignmentStartTime: { lt: endDay },
-          assignmentEndTime: { gt: start }
-        },
-        include: {
-          crew: { select: { id: true, name: true, role: true, crewId: true } },
-          bus: { select: { id: true, busNumber: true } },
-          duty: { select: { id: true, dutyNumber: true, shiftDate: true, startTime: true, endTime: true, status: true, schedulingType: true } }
-        },
-        orderBy: { assignmentStartTime: "asc" }
-      }),
-      prisma.restPeriod.findMany({
-        where: { restStartTime: { lt: endDay }, restEndTime: { gt: start } },
-        include: {
-          crew: { select: { id: true, name: true, role: true, crewId: true } },
-          previousDuty: { select: { id: true, dutyNumber: true } }
-        },
-        orderBy: { restStartTime: "asc" }
-      })
-    ]);
-    const overlaps = new Map();
-    const byCrew = new Map();
-    for (const assignment of assignments) {
-      const crewAssignments = byCrew.get(assignment.crewId) || [];
-      crewAssignments.push(assignment);
-      byCrew.set(assignment.crewId, crewAssignments);
-    }
-    for (const crewAssignments of byCrew.values()) {
-      for (let index = 0; index < crewAssignments.length; index += 1) {
-        for (let nextIndex = index + 1; nextIndex < crewAssignments.length; nextIndex += 1) {
-          const current = crewAssignments[index];
-          const next = crewAssignments[nextIndex];
-          if (current.assignmentStartTime < next.assignmentEndTime
-            && next.assignmentStartTime < current.assignmentEndTime) {
-            overlaps.set(current.id, [...(overlaps.get(current.id) || []), next.dutyId]);
-            overlaps.set(next.id, [...(overlaps.get(next.id) || []), current.dutyId]);
-          }
-        }
-      }
-    }
-    const calendarAssignments = assignments.map((assignment) => ({
-      ...assignment,
-      hasOverlap: overlaps.has(assignment.id),
-      overlappingDutyIds: overlaps.get(assignment.id) || []
-    }));
-    return res.status(200).json({
-      success: true,
-      data: { startDate, endDate, assignments: calendarAssignments, restPeriods }
-    });
-  } catch (error) {
     return next(error);
   }
 }
