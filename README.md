@@ -8,6 +8,7 @@ A comprehensive public transit operations and fleet management platform for Delh
 - **Chunk 3 — Crew Management System (Member 3)**: Fullstack crew roster and duty availability platform featuring Crew database models, qualifications storage, availability validation middleware, RESTful APIs, and responsive admin UI with live availability KPI cards, role filtering (Drivers vs. Conductors), and modal inspector.
 - **Chunk 5 — Trip Management (Member 5)**: Fullstack bus trip scheduling and operations platform featuring Trip database models, Route and Bus associations, PostgreSQL migrations and indexes, time and bus conflict validation middleware, RESTful CRUD APIs with bus availability checking, and responsive admin UI with trip schedule table, statistics cards, route/date/status filters, trip creation and editing forms, and automated integration tests.
 - **Chunk 6 — Linked Duty Scheduling (Member 3)**: Automated and manual linked duty scheduling adhering to permanent 1:1 crew-bus binding (&le; 8.0 hr shifts, dedicated driver-conductor pairs without vehicle handover), collision-free scheduling engine, duty assignment matrix, and full lifecycle management.
+- **Chunk 7 — Unlinked Duty Scheduling & Rest Management**: Admin-protected crew availability and rest APIs, configurable rest enforcement, conflict-checked bus handovers, assignment/rest history, and a responsive schedule, handover, rest, and availability-calendar dashboard.
 - **Route & Stop Management**: PostgreSQL-backed routes and ordered bus stops with interactive OpenStreetMap display.
 
 ## Technology Stack
@@ -133,6 +134,35 @@ Send `Authorization: Bearer <token>` for protected API requests. The browser cle
 - `POST /api/duties` — Create manual linked duty schedule (with &le; 8.0 hr duration, qualification, and double-booking collision guards)
 - `PUT /api/duties/:id` — Update duty shift status, times, or notes
 - `DELETE /api/duties/:id` — Safely remove duty schedule (deletion of active on-road duties is blocked)
+
+## Unlinked Duty Scheduling & Rest Management (Chunk 7)
+
+The protected dashboard is available at `/admin/unlinked-duties`. The module records each driver/conductor assignment independently, prevents overlapping assignments, requires previous trips to be completed before handover, and records the configured post-duty rest period. All new APIs require an administrator JWT (`Authorization: Bearer <token>`).
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/crew/available?at=<ISO-date-time>&role=Driver` | List crew available/resting at a requested time; `includeAll=true` includes all statuses |
+| `GET` | `/api/crew/:id/availability?at=<ISO-date-time>` | Inspect one crew member's calculated status, active/last assignment, and rest time |
+| `GET` | `/api/crew/:id/rest-periods` | Read a crew member's rest history |
+| `GET` | `/api/crew/availability-calendar?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | Read duty and rest timelines with overlap flags |
+| `GET` | `/api/schedules/unlinked` | List unlinked duties (supports date, status, and bus filters) |
+| `POST` | `/api/schedules/unlinked` | Create an unlinked duty after bus, role, overlap, completion, and rest checks |
+| `GET` | `/api/schedules/unlinked/rest-config` | Read the configured minimum rest duration |
+| `POST` | `/api/handovers` | Complete a previous duty, assign replacement driver/conductor, and record both handover events atomically |
+| `GET` | `/api/handovers` | Read paginated handover history |
+
+Set `UNLINKED_DUTY_REST_MINUTES` in `backend/.env` to a whole number from 1 to 1440 (default `480`). The migration backfills assignment history and completed-duty rest history from existing schedules using the default eight-hour rest period.
+
+Apply the additive migration without dropping data, then regenerate Prisma Client:
+
+```sh
+cd backend
+npm run db:generate
+npm run db:migrate
+npm test
+```
+
+The migration adds `crew_assignments`, `duty_handovers`, and `rest_periods` with foreign keys/indexes and backfills existing duty assignments. It does not delete existing operational records.
 
 ## Route and Bus Stop Management
 
