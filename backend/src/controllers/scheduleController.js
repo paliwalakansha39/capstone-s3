@@ -66,9 +66,6 @@ export async function listUnlinkedSchedules(req, res, next) {
     });
     return res.status(200).json({ success: true, data: schedules });
   } catch (error) {
-    if (error.code === "P2002") {
-      return res.status(409).json({ success: false, error: "Duty number is already in use." });
-    }
     return next(error);
   }
 }
@@ -114,6 +111,9 @@ export async function createUnlinkedSchedule(req, res, next) {
     }, { isolationLevel: "Serializable" });
     return res.status(201).json({ success: true, data: schedule });
   } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(409).json({ success: false, error: "Duty number is already in use." });
+    }
     if (error.code === "P2034") {
       return res.status(409).json({ success: false, error: "Schedule changed during assignment. Refresh and retry." });
     }

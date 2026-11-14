@@ -4,10 +4,10 @@ import {
   assertCrewAvailable,
   completeDuty,
   createDutyWithCrew,
+  isValidDate,
   makeDutyInterval,
   statusError
 } from "../services/unlinkedDutyService.js";
-import { isValidDate } from "../services/unlinkedDutyService.js";
 
 function validateHandover(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return "Request body must be an object.";
@@ -26,11 +26,11 @@ function validateHandover(input) {
 }
 
 async function assertPreviousTripCompleted(transaction, duty, busId, interval) {
-  const nextDate = new Date(`${duty.shiftDate}T00:00:00+05:30`);
-  nextDate.setDate(nextDate.getDate() + 1);
+  const nextDate = new Date(`${duty.shiftDate}T00:00:00Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
   const trips = await transaction.trip.findMany({
     where: { busId, tripDate: { in: [duty.shiftDate, nextDate.toISOString().slice(0, 10)] } },
-    select: { id: true, departureTime: true, arrivalTime: true, status: true }
+    select: { id: true, tripDate: true, departureTime: true, arrivalTime: true, status: true }
   });
   const relevantTrips = trips.filter((trip) => {
     const tripInterval = makeDutyInterval(trip.tripDate, trip.departureTime.slice(0, 5), trip.arrivalTime.slice(0, 5));
