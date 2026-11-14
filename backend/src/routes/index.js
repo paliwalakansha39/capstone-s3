@@ -9,6 +9,8 @@ import userRoutes from "./userRoutes.js";
 import dashboardRoutes from "./dashboardRoutes.js";
 import routeRoutes from "./routeRoutes.js";
 import stopRoutes from "./stopRoutes.js";
+import unlinkedScheduleRoutes from "./unlinkedScheduleRoutes.js";
+import handoverRoutes from "./handoverRoutes.js";
 
 const apiRouter = Router();
 
@@ -29,6 +31,8 @@ apiRouter.use("/buses", busRoutes);
 apiRouter.use("/crew", crewRoutes);
 apiRouter.use("/trips", tripRoutes);
 apiRouter.use("/duties", dutyRoutes);
+apiRouter.use("/schedules/unlinked", unlinkedScheduleRoutes);
+apiRouter.use("/handovers", handoverRoutes);
 apiRouter.use("/routes", routeRoutes);
 apiRouter.use("/stops", stopRoutes);
 apiRouter.get("/legacy-routes", getLegacyRoutes);
