@@ -236,7 +236,9 @@ export async function createCrewAssignmentHistory(transaction, duty, assignment)
 
 export async function recordRestPeriods(transaction, dutyId, completedAt) {
   const requiredRestDurationMinutes = getRequiredRestMinutes();
-  const assignments = await transaction.crewAssignment.findMany({ where: { dutyId } });
+  const assignments = await transaction.crewAssignment.findMany({
+    where: { dutyId, status: "Completed", completedAt: { not: null } }
+  });
   const restEndTime = new Date(completedAt.getTime() + requiredRestDurationMinutes * 60000);
   for (const assignment of assignments) {
     await transaction.restPeriod.upsert({

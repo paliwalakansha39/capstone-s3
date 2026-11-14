@@ -7,6 +7,7 @@ import {
   makeDutyInterval,
   statusError
 } from "../services/unlinkedDutyService.js";
+import { isValidDate } from "../services/unlinkedDutyService.js";
 
 function validateHandover(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return "Request body must be an object.";
@@ -14,17 +15,25 @@ function validateHandover(input) {
   if (typeof input.newDriverId !== "string" || !input.newDriverId) return "newDriverId is required.";
   if (typeof input.newConductorId !== "string" || !input.newConductorId) return "newConductorId is required.";
   if (input.newDriverId === input.newConductorId) return "Driver and conductor must be different crew members.";
+  if (input.dutyNumber !== undefined && (typeof input.dutyNumber !== "string" || !input.dutyNumber.trim() || input.dutyNumber.length > 50)) {
+    return "dutyNumber must be a non-empty string of at most 50 characters.";
+  }
+  if (input.depot !== undefined && (typeof input.depot !== "string" || input.depot.length > 100)) {
+    return "depot must be a string of at most 100 characters.";
+  }
   const interval = makeDutyInterval(input.shiftDate, input.startTime, input.endTime);
   return interval.error || null;
 }
 
 async function assertPreviousTripCompleted(transaction, duty, busId, interval) {
+  const nextDate = new Date(`${duty.shiftDate}T00:00:00+05:30`);
+  nextDate.setDate(nextDate.getDate() + 1);
   const trips = await transaction.trip.findMany({
-    where: { busId, tripDate: duty.shiftDate },
+    where: { busId, tripDate: { in: [duty.shiftDate, nextDate.toISOString().slice(0, 10)] } },
     select: { id: true, departureTime: true, arrivalTime: true, status: true }
   });
   const relevantTrips = trips.filter((trip) => {
-    const tripInterval = makeDutyInterval(duty.shiftDate, trip.departureTime.slice(0, 5), trip.arrivalTime.slice(0, 5));
+    const tripInterval = makeDutyInterval(trip.tripDate, trip.departureTime.slice(0, 5), trip.arrivalTime.slice(0, 5));
     return tripInterval.start && tripInterval.start < interval.end && tripInterval.end > interval.start;
   });
   const incomplete = relevantTrips.find((trip) => trip.status !== "Completed");
@@ -154,6 +163,9 @@ export async function createHandover(req, res, next) {
 
     return res.status(201).json({ success: true, data: result });
   } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(409).json({ success: false, error: "Duty number is already in use." });
+    }
     if (error.code === "P2034") {
       return res.status(409).json({ success: false, error: "Crew or bus availability changed during handover. Refresh and retry." });
     }

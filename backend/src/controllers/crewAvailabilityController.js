@@ -9,6 +9,9 @@ function parseAt(value) {
 
 export async function listAvailableCrew(req, res, next) {
   try {
+    if (req.query.role && !["Driver", "Conductor"].includes(req.query.role)) {
+      return res.status(400).json({ success: false, error: "role must be Driver or Conductor." });
+    }
     const at = parseAt(req.query.at);
     if (!at) return res.status(400).json({ success: false, error: "at must be a valid ISO date-time." });
     const where = req.query.role === "Driver" || req.query.role === "Conductor"
