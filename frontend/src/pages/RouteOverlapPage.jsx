@@ -227,6 +227,8 @@ export default function RouteOverlapPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyList, setHistoryList] = useState([]);
   const [savingRoute, setSavingRoute] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -240,9 +242,12 @@ export default function RouteOverlapPage() {
     setAnalyzing(true);
     try {
       const data = await analyzeRouteOverlap({
-        coordinates: proposedPoints,
+        coordinates: proposedPoints.map((p) => ({
+          latitude: parseFloat(p.latitude),
+          longitude: parseFloat(p.longitude)
+        })),
         proposedRouteName: routeName.trim() || "Proposed Route",
-        toleranceMeters: Number(toleranceMeters),
+        toleranceMeters: Number(toleranceMeters) || DEFAULT_TOLERANCE_METERS,
         saveRecord: true
       });
       setAnalysisResult(data);
@@ -265,7 +270,11 @@ export default function RouteOverlapPage() {
     try {
       const saved = await saveProposedRoute({
         name: routeName.trim() || "Proposed Route",
-        coordinates: proposedPoints
+        coordinates: proposedPoints.map((p, idx) => ({
+          latitude: parseFloat(p.latitude),
+          longitude: parseFloat(p.longitude),
+          name: p.name || `Waypoint ${idx + 1}`
+        }))
       });
       setNotice(`Proposed route '${saved.name}' was saved successfully.`);
     } catch (err) {
@@ -287,17 +296,34 @@ export default function RouteOverlapPage() {
   };
 
   const handleSelectHistoryItem = (item) => {
+    const segments = item.overlappingSegments || [];
+    const routesMap = new Map();
+    segments.forEach((seg) => {
+      if (!routesMap.has(seg.existingRouteId)) {
+        routesMap.set(seg.existingRouteId, {
+          existingRouteId: seg.existingRouteId,
+          existingRouteNumber: seg.existingRouteNumber,
+          existingRouteName: seg.existingRouteName,
+          startingPoint: seg.startPoint || "Segment Start",
+          destination: seg.endPoint || "Segment End",
+          overlapDistanceKm: Math.round(((seg.overlapDistanceMeters ?? seg.overlapDistance ?? 0) / 1000) * 100) / 100,
+          overlapPercentage: Number(seg.overlapPercentage) || 0
+        });
+      }
+    });
+
+    setToleranceMeters(item.toleranceMeters || DEFAULT_TOLERANCE_METERS);
     setAnalysisResult({
       toleranceMeters: item.toleranceMeters,
       proposedTotalDistanceKm: item.proposedTotalDistance,
       overlappingDistanceKm: item.overlappingDistance,
       overlapPercentage: item.overlapPercentage,
-      affectedRoutes: [],
-      overlappingSegments: item.overlappingSegments || [],
-      overlappingPolylines: (item.overlappingSegments || []).map((s) => s.segmentCoordinates || []),
+      affectedRoutes: Array.from(routesMap.values()),
+      overlappingSegments: segments,
+      overlappingPolylines: segments.map((s) => s.segmentCoordinates || []).filter((c) => c.length >= 2),
       nonOverlappingPolylines: []
     });
-    setRouteName(item.proposedRouteName);
+    setRouteName(item.proposedRouteName || "Proposed Route");
     setHistoryOpen(false);
     setNotice(`Loaded historical analysis from ${new Date(item.createdAt).toLocaleString()}.`);
   };
