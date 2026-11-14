@@ -32,6 +32,7 @@ import {
 } from "../services/routeOverlapService";
 
 const DELHI_CENTER = [28.6139, 77.209];
+const DEFAULT_TOLERANCE_METERS = 50;
 
 // Custom icon generator for proposed waypoints (numbered blue circle)
 function createNumberedWaypointIcon(number, isTerminal = false) {
@@ -217,6 +218,7 @@ export default function RouteOverlapPage() {
   const [mapCenter] = useState(DELHI_CENTER);
   const [proposedPoints, setProposedPoints] = useState([]);
   const [routeName, setRouteName] = useState("New Proposed Route");
+  const [toleranceMeters, setToleranceMeters] = useState(DEFAULT_TOLERANCE_METERS);
   const [drawingMode, setDrawingMode] = useState(true);
   const [existingRoutes, setExistingRoutes] = useState([]);
   const [showExistingRoutes, setShowExistingRoutes] = useState(true);
