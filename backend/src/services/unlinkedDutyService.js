@@ -275,8 +275,8 @@ export async function completeDuty(transaction, duty, completedAt = new Date()) 
   await recordRestPeriods(transaction, duty.id, completedAt);
 }
 
-export async function availabilityForCrew(transaction, crew, at = new Date()) {
-  const [activeAssignment, latestAssignment, latestRest] = await Promise.all([
+export async function availabilityForCrew(transaction, crew, at = new Date(), until = at) {
+  const [activeAssignment, overlappingAssignment, latestAssignment, latestRest] = await Promise.all([
     transaction.crewAssignment.findFirst({
       where: {
         crewId: crew.id,
@@ -287,6 +287,16 @@ export async function availabilityForCrew(transaction, crew, at = new Date()) {
       include: { duty: true, bus: true },
       orderBy: { assignmentStartTime: "asc" }
     }),
+    until > at ? transaction.crewAssignment.findFirst({
+      where: {
+        crewId: crew.id,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        assignmentStartTime: { lt: until },
+        assignmentEndTime: { gt: at }
+      },
+      include: { duty: true, bus: true },
+      orderBy: { assignmentStartTime: "asc" }
+    }) : Promise.resolve(null),
     transaction.crewAssignment.findFirst({
       where: { crewId: crew.id, status: "Completed", completedAt: { not: null } },
       include: { duty: true, bus: true },
@@ -303,6 +313,8 @@ export async function availabilityForCrew(transaction, crew, at = new Date()) {
     availability = "Not Available";
   } else if (activeAssignment) {
     availability = "On Duty";
+  } else if (overlappingAssignment) {
+    availability = "Not Available";
   } else if (latestRest && latestRest.restEndTime > at) {
     availability = "Resting";
   }
@@ -323,13 +335,13 @@ export async function availabilityForCrew(transaction, crew, at = new Date()) {
     remainingRestMinutes,
     availableAt: latestRest?.restEndTime?.toISOString() || null,
     lastDutyCompletedAt: latestAssignment?.completedAt?.toISOString() || null,
-    currentAssignment: activeAssignment ? {
-      dutyId: activeAssignment.dutyId,
-      dutyNumber: activeAssignment.duty.dutyNumber,
-      busId: activeAssignment.busId,
-      busNumber: activeAssignment.bus.busNumber,
-      startTime: activeAssignment.assignmentStartTime.toISOString(),
-      endTime: activeAssignment.assignmentEndTime.toISOString()
+    currentAssignment: (activeAssignment || overlappingAssignment) ? {
+      dutyId: (activeAssignment || overlappingAssignment).dutyId,
+      dutyNumber: (activeAssignment || overlappingAssignment).duty.dutyNumber,
+      busId: (activeAssignment || overlappingAssignment).busId,
+      busNumber: (activeAssignment || overlappingAssignment).bus.busNumber,
+      startTime: (activeAssignment || overlappingAssignment).assignmentStartTime.toISOString(),
+      endTime: (activeAssignment || overlappingAssignment).assignmentEndTime.toISOString()
     } : null,
     lastDuty: latestAssignment ? {
       dutyId: latestAssignment.dutyId,

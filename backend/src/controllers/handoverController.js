@@ -90,6 +90,10 @@ export async function createHandover(req, res, next) {
         { member: previousDuty.assignment.driver, role: "Driver" },
         { member: previousDuty.assignment.conductor, role: "Conductor" }
       ];
+      if (input.newDriverId === previousDuty.assignment.driverId
+        || input.newConductorId === previousDuty.assignment.conductorId) {
+        throw Object.assign(new Error("Each replacement crew member must differ from the previous crew member in that role."), { statusCode: 409 });
+      }
       for (const previous of previousCrews) {
         const history = previousDuty.crewAssignments.find((assignment) => assignment.crewId === previous.member.id);
         if (!history) {

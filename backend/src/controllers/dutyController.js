@@ -76,7 +76,10 @@ export async function getAllDuties(req, res, next) {
           assignment: {
             include: {
               bus: {
-                select: { id: true, busNumber: true, registrationNumber: true, busType: true, depot: true }
+                select: {
+                  id: true, busNumber: true, registrationNumber: true, busType: true, depot: true,
+                  route: { select: { routeNumber: true, routeName: true } }
+                }
               },
               driver: {
                 select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true }
@@ -173,7 +176,10 @@ export async function getDutyById(req, res, next) {
         assignment: {
           include: {
             bus: {
-              select: { id: true, busNumber: true, registrationNumber: true, busType: true, depot: true, capacity: true }
+              select: {
+                id: true, busNumber: true, registrationNumber: true, busType: true, depot: true, capacity: true,
+                route: { select: { routeNumber: true, routeName: true } }
+              }
             },
             driver: {
               select: { id: true, name: true, crewId: true, badgeNumber: true, licenseNumber: true, phone: true, status: true }
@@ -384,7 +390,20 @@ export async function deleteDuty(req, res, next) {
       });
     }
 
-    await prisma.duty.delete({ where: { id } });
+    await prisma.$transaction(async (transaction) => {
+      const history = await transaction.dutyHandover.count({
+        where: { OR: [{ previousDutyId: id }, { newDutyId: id }] }
+      });
+      const restPeriods = await transaction.restPeriod.count({ where: { previousDutyId: id } });
+      if (history || restPeriods || duty.status !== "Scheduled") {
+        const error = new Error("This duty has operational history and cannot be deleted. Cancel it instead to preserve its records.");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      await transaction.crewAssignment.deleteMany({ where: { dutyId: id, status: "Scheduled" } });
+      await transaction.duty.delete({ where: { id } });
+    });
 
     return res.status(200).json({
       success: true,

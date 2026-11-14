@@ -13,7 +13,12 @@ import {
 const includeSchedule = {
   assignment: {
     include: {
-      bus: { select: { id: true, busNumber: true, status: true, depot: true } },
+      bus: {
+        select: {
+          id: true, busNumber: true, status: true, depot: true,
+          route: { select: { routeNumber: true, routeName: true } }
+        }
+      },
       driver: { select: { id: true, name: true, crewId: true, badgeNumber: true, role: true } },
       conductor: { select: { id: true, name: true, crewId: true, badgeNumber: true, role: true } }
     }

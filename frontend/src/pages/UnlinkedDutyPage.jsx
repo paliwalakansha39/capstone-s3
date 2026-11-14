@@ -52,6 +52,12 @@ function isoWithIndiaOffset(date, time) {
   return `${date}T${time}:00+05:30`;
 }
 
+function addCalendarDay(date) {
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 function displayDate(value) {
   return value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 }
@@ -123,7 +129,7 @@ export default function UnlinkedDutyPage() {
       setCalendar(calendarResult.data || { assignments: [], restPeriods: [] });
       setScheduleForm((previous) => ({
         ...previous,
-        busId: previous.busId || busResult.data?.[0]?.id || ""
+        busId: previous.busId || busResult.data?.find((bus) => ["Active", "Available"].includes(bus.status))?.id || ""
       }));
       setHandoverForm((previous) => ({
         ...previous,
@@ -144,8 +150,12 @@ export default function UnlinkedDutyPage() {
   const refreshAvailability = useCallback(async () => {
     if (!availabilityAt.shiftDate || !availabilityAt.startTime) return;
     try {
+      const endDate = availabilityAt.endTime <= availabilityAt.startTime
+        ? addCalendarDay(availabilityAt.shiftDate)
+        : availabilityAt.shiftDate;
       const result = await getAvailableCrew({
         at: isoWithIndiaOffset(availabilityAt.shiftDate, availabilityAt.startTime),
+        until: isoWithIndiaOffset(endDate, availabilityAt.endTime),
         includeAll: "true"
       });
       setAvailability(result.data || []);
@@ -287,7 +297,7 @@ export default function UnlinkedDutyPage() {
                 {currentDuties.length ? <div className="unlinked-table-scroll"><table className="unlinked-table">
                   <thead><tr><th>Bus / Route</th><th>Driver &amp; conductor</th><th>Duty time</th><th>Status</th></tr></thead>
                   <tbody>{currentDuties.map((duty) => <tr key={duty.id}>
-                    <td><strong>{duty.assignment.bus?.busNumber || "—"}</strong><small>{duty.shiftDate}</small></td>
+                    <td><strong>{duty.assignment.bus?.busNumber || "—"}</strong><small>{duty.assignment.bus?.route ? `${duty.assignment.bus.route.routeNumber} · ${duty.assignment.bus.route.routeName}` : duty.shiftDate}</small></td>
                     <td>{duty.assignment.driver?.name || "—"}<small>{duty.assignment.conductor?.name || "—"}</small></td>
                     <td>{duty.startTime?.slice(0, 5)}–{duty.endTime?.slice(0, 5)}</td>
                     <td><span className={`crew-status status-${duty.status.toLowerCase()}`}>{duty.status}</span></td>

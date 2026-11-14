@@ -3,8 +3,15 @@ import { availabilityForCrew, getRequiredRestMinutes, isValidDate } from "../ser
 
 function parseAt(value) {
   if (value === undefined) return new Date();
-  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(value) || Number.isNaN(Date.parse(value))) return null;
   return new Date(value);
+}
+
+function parseUntil(value, at) {
+  if (value === undefined) return at;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(value) || Number.isNaN(Date.parse(value))) return null;
+  const until = new Date(value);
+  return until > at ? until : null;
 }
 
 export async function listAvailableCrew(req, res, next) {
@@ -14,6 +21,8 @@ export async function listAvailableCrew(req, res, next) {
     }
     const at = parseAt(req.query.at);
     if (!at) return res.status(400).json({ success: false, error: "at must be a valid ISO date-time." });
+    const until = parseUntil(req.query.until, at);
+    if (!until) return res.status(400).json({ success: false, error: "until must be a valid ISO date-time later than at." });
     const where = req.query.role === "Driver" || req.query.role === "Conductor"
       ? { role: req.query.role }
       : {};
@@ -21,7 +30,7 @@ export async function listAvailableCrew(req, res, next) {
       where,
       orderBy: [{ role: "asc" }, { name: "asc" }]
     });
-    const data = await Promise.all(crew.map((member) => availabilityForCrew(prisma, member, at)));
+    const data = await Promise.all(crew.map((member) => availabilityForCrew(prisma, member, at, until)));
     return res.status(200).json({
       success: true,
       data: req.query.includeAll === "true"
@@ -38,9 +47,11 @@ export async function getCrewAvailability(req, res, next) {
   try {
     const at = parseAt(req.query.at);
     if (!at) return res.status(400).json({ success: false, error: "at must be a valid ISO date-time." });
+    const until = parseUntil(req.query.until, at);
+    if (!until) return res.status(400).json({ success: false, error: "until must be a valid ISO date-time later than at." });
     const crew = await prisma.crew.findUnique({ where: { id: req.params.id } });
     if (!crew) return res.status(404).json({ success: false, error: "Crew member not found." });
-    const data = await availabilityForCrew(prisma, crew, at);
+    const data = await availabilityForCrew(prisma, crew, at, until);
     return res.status(200).json({ success: true, data });
   } catch (error) {
     return next(error);
@@ -82,7 +93,12 @@ export async function getCrewAvailabilityCalendar(req, res, next) {
 
     const crew = await prisma.crew.findMany({
       orderBy: [{ role: "asc" }, { name: "asc" }],
-      include: {
+      select: {
+        id: true,
+        name: true,
+        crewId: true,
+        role: true,
+        status: true,
         crewAssignments: {
           where: {
             assignmentStartTime: { lt: new Date(`${endDate}T23:59:59.999+05:30`) },
