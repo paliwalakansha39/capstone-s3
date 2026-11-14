@@ -363,8 +363,8 @@ export default function UnlinkedDutyPage() {
             <div>
               <div className="unlinked-calendar-controls"><label>Starting date<input type="date" value={calendarStart} onChange={(event) => setCalendarStart(event.target.value)} /></label><small>Shows assignments and protected rest periods for seven days.</small></div>
               {calendar.assignments.length || calendar.restPeriods.length ? <div className="unlinked-calendar-list">
-                {calendar.assignments.map((assignment) => <article key={`a-${assignment.id}`} className="calendar-assignment">
-                  <span className="calendar-mark">DUTY</span><div><strong>{assignment.crew.name} · {assignment.crew.role}</strong><p>{assignment.duty.dutyNumber} · Bus {assignment.bus.busNumber} · {assignment.status}</p></div>
+                {calendar.assignments.map((assignment) => <article key={`a-${assignment.id}`} className={`calendar-assignment ${assignment.hasOverlap ? "calendar-overlap" : ""}`}>
+                  <span className="calendar-mark">{assignment.hasOverlap ? "OVERLAP" : "DUTY"}</span><div><strong>{assignment.crew.name} · {assignment.crew.role}</strong><p>{assignment.duty.dutyNumber} · Bus {assignment.bus.busNumber} · {assignment.status}</p></div>
                   <time>{displayDate(assignment.assignmentStartTime)} – {displayTime(assignment.assignmentEndTime)}</time>
                 </article>)}
                 {calendar.restPeriods.map((rest) => <article key={`r-${rest.id}`} className="calendar-rest">

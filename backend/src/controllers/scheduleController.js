@@ -4,6 +4,7 @@ import {
   assertCrewAvailable,
   createDutyWithCrew,
   getRequiredRestMinutes,
+  isValidDate,
   localDateBoundary,
   makeDutyInterval,
   statusError
@@ -44,8 +45,8 @@ export async function listUnlinkedSchedules(req, res, next) {
     const { startDate, endDate, status, busId } = req.query;
     const where = { schedulingType: "Unlinked" };
     if (startDate || endDate) {
-      if ((startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate))
-        || (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate))) {
+      if ((startDate && !isValidDate(startDate)) || (endDate && !isValidDate(endDate))
+        || (startDate && endDate && startDate > endDate)) {
         return res.status(400).json({ success: false, error: "startDate and endDate must use YYYY-MM-DD format." });
       }
       where.shiftDate = {};
@@ -156,7 +157,35 @@ export async function getAvailabilityCalendar(req, res, next) {
         orderBy: { restStartTime: "asc" }
       })
     ]);
-    return res.status(200).json({ success: true, data: { startDate, endDate, assignments, restPeriods } });
+    const overlaps = new Map();
+    const byCrew = new Map();
+    for (const assignment of assignments) {
+      const crewAssignments = byCrew.get(assignment.crewId) || [];
+      crewAssignments.push(assignment);
+      byCrew.set(assignment.crewId, crewAssignments);
+    }
+    for (const crewAssignments of byCrew.values()) {
+      for (let index = 0; index < crewAssignments.length; index += 1) {
+        for (let nextIndex = index + 1; nextIndex < crewAssignments.length; nextIndex += 1) {
+          const current = crewAssignments[index];
+          const next = crewAssignments[nextIndex];
+          if (current.assignmentStartTime < next.assignmentEndTime
+            && next.assignmentStartTime < current.assignmentEndTime) {
+            overlaps.set(current.id, [...(overlaps.get(current.id) || []), next.dutyId]);
+            overlaps.set(next.id, [...(overlaps.get(next.id) || []), current.dutyId]);
+          }
+        }
+      }
+    }
+    const calendarAssignments = assignments.map((assignment) => ({
+      ...assignment,
+      hasOverlap: overlaps.has(assignment.id),
+      overlappingDutyIds: overlaps.get(assignment.id) || []
+    }));
+    return res.status(200).json({
+      success: true,
+      data: { startDate, endDate, assignments: calendarAssignments, restPeriods }
+    });
   } catch (error) {
     return next(error);
   }

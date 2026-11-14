@@ -773,6 +773,8 @@ td{height:52px;border-top:1px solid #f0f2f3;font-size:9px;color:#687984}
 .unlinked-calendar-list article{display:grid;grid-template-columns:55px minmax(150px,1fr) minmax(160px,auto);align-items:center;gap:12px;padding:13px 10px;border-bottom:1px solid #edf0f1}
 .calendar-mark{font-size:8px;font-weight:700;letter-spacing:.7px;color:#286044;background:#e8f6ef;padding:6px 7px;text-align:center}
 .calendar-rest .calendar-mark{background:#fff4e8;color:#ae6227}
+.calendar-overlap{background:#fff8f6}
+.calendar-overlap .calendar-mark{background:#fceced;color:#a64248}
 .unlinked-calendar-list strong{font-size:11px;color:var(--navy)}
 .unlinked-calendar-list p{font-size:9px;color:#788791;margin:4px 0 0}
 .unlinked-calendar-list time{font-size:9px;color:#6b7b85;text-align:right}

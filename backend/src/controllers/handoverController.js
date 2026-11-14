@@ -34,7 +34,7 @@ async function assertPreviousTripCompleted(transaction, duty, busId, interval) {
   });
   const relevantTrips = trips.filter((trip) => {
     const tripInterval = makeDutyInterval(trip.tripDate, trip.departureTime.slice(0, 5), trip.arrivalTime.slice(0, 5));
-    return tripInterval.start && tripInterval.start < interval.end && tripInterval.end > interval.start;
+    return !tripInterval.error && tripInterval.start < interval.end && tripInterval.end > interval.start;
   });
   const incomplete = relevantTrips.find((trip) => trip.status !== "Completed");
   if (incomplete) {
