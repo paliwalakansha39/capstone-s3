@@ -212,32 +212,35 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
       }
       dutySequence++;
 
-      const duty = await prisma.duty.create({
-        data: {
-          dutyNumber,
-          shiftType,
-          shiftDate,
-          startTime: shiftStart,
-          endTime: shiftEnd,
-          depot: bus.depot || depot || "BBM Depot",
-          totalDurationHours: durationHours,
-          status: "Scheduled",
-          schedulingType: "Linked"
-        }
-      });
+      const { duty, assignment } = await prisma.$transaction(async (transaction) => {
+        const createdDuty = await transaction.duty.create({
+          data: {
+            dutyNumber,
+            shiftType,
+            shiftDate,
+            startTime: shiftStart,
+            endTime: shiftEnd,
+            depot: bus.depot || depot || "BBM Depot",
+            totalDurationHours: durationHours,
+            status: "Scheduled",
+            schedulingType: "Linked"
+          }
+        });
 
-      const assignment = await prisma.dutyAssignment.create({
-        data: {
-          dutyId: duty.id,
-          busId: bus.id,
-          driverId: selectedDriver.id,
-          conductorId: selectedConductor.id,
-          vehicleHandoverVerified: true,
-          totalTripsCovered: busTrips.length,
-          notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
-        }
+        const createdAssignment = await transaction.dutyAssignment.create({
+          data: {
+            dutyId: createdDuty.id,
+            busId: bus.id,
+            driverId: selectedDriver.id,
+            conductorId: selectedConductor.id,
+            vehicleHandoverVerified: true,
+            totalTripsCovered: busTrips.length,
+            notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
+          }
+        });
+        await createCrewAssignmentHistory(transaction, createdDuty, createdAssignment);
+        return { duty: createdDuty, assignment: createdAssignment };
       });
-      await createCrewAssignmentHistory(prisma, duty, assignment);
 
       createdDuties.push({
         duty,

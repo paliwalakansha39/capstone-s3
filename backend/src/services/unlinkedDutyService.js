@@ -202,12 +202,12 @@ export async function createDutyWithCrew(transaction, {
 }
 
 export async function createCrewAssignmentHistory(transaction, duty, assignment) {
-  const interval = makeDutyInterval(
-    duty.shiftDate,
-    duty.startTime.slice(0, 5),
-    duty.endTime.slice(0, 5)
-  );
-  if (interval.error) throw badRequest(interval.error);
+  if (!isValidDate(duty.shiftDate) || !validTime(duty.startTime.slice(0, 5)) || !validTime(duty.endTime.slice(0, 5))) {
+    throw badRequest("Duty date and times are invalid; assignment history could not be recorded.");
+  }
+  const start = localDateTimeToUTC(duty.shiftDate, duty.startTime.slice(0, 5));
+  let end = localDateTimeToUTC(duty.shiftDate, duty.endTime.slice(0, 5));
+  if (end <= start) end = new Date(end.getTime() + DAY_MS);
   return Promise.all([
     transaction.crewAssignment.create({
       data: {
@@ -215,8 +215,8 @@ export async function createCrewAssignmentHistory(transaction, duty, assignment)
         busId: assignment.busId,
         dutyId: duty.id,
         role: "Driver",
-        assignmentStartTime: interval.start,
-        assignmentEndTime: interval.end,
+        assignmentStartTime: start,
+        assignmentEndTime: end,
         status: duty.status === "Active" ? "Active" : "Scheduled"
       }
     }),
@@ -226,8 +226,8 @@ export async function createCrewAssignmentHistory(transaction, duty, assignment)
         busId: assignment.busId,
         dutyId: duty.id,
         role: "Conductor",
-        assignmentStartTime: interval.start,
-        assignmentEndTime: interval.end,
+        assignmentStartTime: start,
+        assignmentEndTime: end,
         status: duty.status === "Active" ? "Active" : "Scheduled"
       }
     })
