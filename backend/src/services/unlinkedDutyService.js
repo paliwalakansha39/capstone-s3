@@ -14,13 +14,20 @@ export function getRequiredRestMinutes() {
 }
 
 export function makeDutyInterval(shiftDate, startTime, endTime) {
-  if (typeof shiftDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)
-    || Number.isNaN(Date.parse(`${shiftDate}T00:00:00Z`))
-    || new Date(`${shiftDate}T00:00:00Z`).toISOString().slice(0, 10) !== shiftDate) {
-    return { error: "shiftDate must be a valid calendar date in YYYY-MM-DD format." };
-  }
+  if (!isValidDate(shiftDate)) return { error: "shiftDate must be a valid calendar date in YYYY-MM-DD format." };
   if (!validTime(startTime) || !validTime(endTime) || startTime === endTime) {
     return { error: "startTime and endTime must be different valid HH:mm times." };
+  }
+
+  export function isValidDate(value) {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+      && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  }
+
+  export function localDateBoundary(date, endOfDay = false) {
+    if (!isValidDate(date)) return null;
+    return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+05:30`);
   }
 
   const start = localDateTimeToUTC(shiftDate, startTime);
