@@ -13,6 +13,7 @@ import BusManagementPage from "./pages/BusManagementPage";
 import CrewManagementPage from "./pages/CrewManagementPage";
 import TripManagementPage from "./pages/TripManagementPage";
 import DutySchedulingPage from "./pages/DutySchedulingPage";
+import UnlinkedDutyPage from "./pages/UnlinkedDutyPage";
 const RouteManagementPage = lazy(() => import("./pages/RouteManagementPage"));
 const RouteOverlapPage = lazy(() => import("./pages/RouteOverlapPage"));
 
@@ -35,6 +36,8 @@ export default function App() {
       <Route path="route-overlap" element={<Suspense fallback={<main className="loading-box"><span className="spinner" />Loading overlap detection...</main>}><RouteOverlapPage /></Suspense>} />
       {/* Chunk 6: Linked Duty Scheduling */}
       <Route path="duties" element={<DutySchedulingPage />} />
+      {/* Chunk 7: Unlinked Duty Scheduling */}
+      <Route path="unlinked-duties" element={<UnlinkedDutyPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;

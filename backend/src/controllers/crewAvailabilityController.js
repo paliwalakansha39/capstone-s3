@@ -21,7 +21,9 @@ export async function listAvailableCrew(req, res, next) {
     const data = await Promise.all(crew.map((member) => availabilityForCrew(prisma, member, at)));
     return res.status(200).json({
       success: true,
-      data: data.filter((member) => member.status === "Available" || member.status === "Resting"),
+      data: req.query.includeAll === "true"
+        ? data
+        : data.filter((member) => member.status === "Available" || member.status === "Resting"),
       meta: { at: at.toISOString(), requiredRestDurationMinutes: getRequiredRestMinutes() }
     });
   } catch (error) {

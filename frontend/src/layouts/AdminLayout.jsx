@@ -2,6 +2,7 @@ import {
   BusFront,
   CalendarCheck,
   CalendarDays,
+  ArrowRightLeft,
   ChevronRight,
   CircleUserRound,
   Layers,
@@ -26,7 +27,8 @@ const links = [
   { to: "/admin/routes", label: "Route Management", icon: Map },
   { to: "/admin/route-overlap", label: "Route Overlap", icon: Layers },
   { to: "/admin/trips", label: "Trip Management", icon: CalendarDays },
-  { to: "/admin/duties", label: "Duty Scheduling", icon: CalendarCheck }
+  { to: "/admin/duties", label: "Duty Scheduling", icon: CalendarCheck },
+  { to: "/admin/unlinked-duties", label: "Unlinked Duty & Rest", icon: ArrowRightLeft }
 ];
 
 export default function AdminLayout({ admin, logout, context }) {
