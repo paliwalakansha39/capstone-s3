@@ -97,6 +97,8 @@ model Bus {
   driver             Driver?          @relation(fields: [driverId], references: [id], onDelete: SetNull)
   trips              Trip[]
   dutyAssignments    DutyAssignment[]
+  crewAssignments    CrewAssignment[]
+  handovers          DutyHandover[]
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 
@@ -117,6 +119,10 @@ model Crew {
   phone           String?          @db.VarChar(30)
   driverDuties    DutyAssignment[] @relation("DutyDriver")
   conductorDuties DutyAssignment[] @relation("DutyConductor")
+  crewAssignments CrewAssignment[]
+  restPeriods     RestPeriod[]
+  handoversFrom   DutyHandover[]   @relation("PreviousCrew")
+  handoversTo     DutyHandover[]   @relation("NextCrew")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -158,6 +164,10 @@ model Duty {
   status             String          @default("Scheduled") @db.VarChar(30)
   schedulingType     String          @default("Linked") @map("scheduling_type") @db.VarChar(30)
   assignment         DutyAssignment?
+  crewAssignments   CrewAssignment[]
+  handoversFrom     DutyHandover[] @relation("PreviousDuty")
+  handoversTo       DutyHandover[] @relation("NextDuty")
+  restPeriods       RestPeriod[]
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
@@ -186,6 +196,71 @@ model DutyAssignment {
   @@index([driverId])
   @@index([conductorId])
   @@map("duty_assignments")
+}
+
+model CrewAssignment {
+  id                  String   @id @default(uuid())
+  crewId              String   @map("crew_id")
+  busId               String   @map("bus_id")
+  dutyId              String   @map("duty_id")
+  role                String   @db.VarChar(20)
+  assignmentStartTime DateTime @map("assignment_start_time") @db.Timestamptz(3)
+  assignmentEndTime   DateTime @map("assignment_end_time") @db.Timestamptz(3)
+  status              String   @default("Scheduled") @map("assignment_status") @db.VarChar(20)
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz(3)
+  crew                Crew     @relation(fields: [crewId], references: [id], onDelete: Restrict)
+  bus                 Bus      @relation(fields: [busId], references: [id], onDelete: Restrict)
+  duty                Duty     @relation(fields: [dutyId], references: [id], onDelete: Restrict)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([dutyId, crewId])
+  @@unique([dutyId, role])
+  @@index([crewId, assignmentStartTime, assignmentEndTime])
+  @@index([busId, assignmentStartTime, assignmentEndTime])
+  @@index([status, assignmentStartTime])
+  @@map("crew_assignments")
+}
+
+model DutyHandover {
+  id                    String   @id @default(uuid())
+  busId                 String   @map("bus_id")
+  previousCrewMemberId  String   @map("previous_crew_member_id")
+  newCrewMemberId       String   @map("new_crew_member_id")
+  previousDutyId        String   @map("previous_duty_id")
+  newDutyId             String   @map("new_duty_id")
+  handoverTimestamp     DateTime @map("handover_timestamp") @db.Timestamptz(3)
+  bus                   Bus      @relation(fields: [busId], references: [id], onDelete: Restrict)
+  previousCrewMember    Crew     @relation("PreviousCrew", fields: [previousCrewMemberId], references: [id], onDelete: Restrict)
+  newCrewMember         Crew     @relation("NextCrew", fields: [newCrewMemberId], references: [id], onDelete: Restrict)
+  previousDuty          Duty     @relation("PreviousDuty", fields: [previousDutyId], references: [id], onDelete: Restrict)
+  newDuty               Duty     @relation("NextDuty", fields: [newDutyId], references: [id], onDelete: Restrict)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([busId, handoverTimestamp])
+  @@index([previousCrewMemberId, handoverTimestamp])
+  @@index([newCrewMemberId, handoverTimestamp])
+  @@index([previousDutyId])
+  @@index([newDutyId])
+  @@map("duty_handovers")
+}
+
+model RestPeriod {
+  id                          String   @id @default(uuid())
+  crewId                      String   @map("crew_id")
+  previousDutyId              String   @map("previous_duty_id")
+  restStartTime               DateTime @map("rest_start_time") @db.Timestamptz(3)
+  requiredRestDurationMinutes Int      @map("required_rest_duration_minutes")
+  restEndTime                 DateTime @map("rest_end_time") @db.Timestamptz(3)
+  status                      String   @default("Resting") @db.VarChar(20)
+  crew                        Crew     @relation(fields: [crewId], references: [id], onDelete: Restrict)
+  previousDuty                Duty     @relation(fields: [previousDutyId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([crewId, previousDutyId])
+  @@index([crewId, restStartTime, restEndTime])
+  @@index([status, restEndTime])
+  @@map("rest_periods")
 }
 
 model ProposedRoute {
