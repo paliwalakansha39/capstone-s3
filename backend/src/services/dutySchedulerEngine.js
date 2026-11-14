@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { createCrewAssignmentHistory } from "./unlinkedDutyService.js";
 import {
   calculateShiftDurationHours,
   findBusDutyConflict,
@@ -236,6 +237,7 @@ export async function generateLinkedDuties({ shiftDate, depot = null, adminId = 
           notes: `Automated Linked Schedule: ${selectedDriver.name} (Driver) & ${selectedConductor.name} (Conductor) permanently bound to Bus ${bus.busNumber} covering ${busTrips.length} trips.`
         }
       });
+      await createCrewAssignmentHistory(prisma, duty, assignment);
 
       createdDuties.push({
         duty,

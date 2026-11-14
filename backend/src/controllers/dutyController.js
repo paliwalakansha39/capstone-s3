@@ -3,6 +3,10 @@ import {
   calculateShiftDurationHours
 } from "../middleware/dutyValidationMiddleware.js";
 import { generateLinkedDuties } from "../services/dutySchedulerEngine.js";
+import {
+  completeDuty,
+  createCrewAssignmentHistory
+} from "../services/unlinkedDutyService.js";
 
 /**
  * GET /api/duties
@@ -248,30 +252,32 @@ export async function createDuty(req, res, next) {
 
     const duration = calculateShiftDurationHours(startTime, endTime);
 
-    const newDuty = await prisma.duty.create({
-      data: {
-        dutyNumber: dutyNumber.trim(),
-        shiftType,
-        shiftDate,
-        startTime,
-        endTime,
-        depot,
-        totalDurationHours: duration,
-        status: "Scheduled",
-        schedulingType: "Linked",
-        assignment: {
-          create: {
-            busId,
-            driverId,
-            conductorId,
-            vehicleHandoverVerified: true,
-            notes: notes || "Manual Linked Duty assignment."
+    const newDuty = await prisma.$transaction(async (transaction) => {
+      const duty = await transaction.duty.create({
+        data: {
+          dutyNumber: dutyNumber.trim(),
+          shiftType,
+          shiftDate,
+          startTime,
+          endTime,
+          depot,
+          totalDurationHours: duration,
+          status: "Scheduled",
+          schedulingType: "Linked",
+          assignment: {
+            create: {
+              busId,
+              driverId,
+              conductorId,
+              vehicleHandoverVerified: true,
+              notes: notes || "Manual Linked Duty assignment."
+            }
           }
-        }
-      },
-      include: {
-        assignment: true
-      }
+        },
+        include: { assignment: true }
+      });
+      await createCrewAssignmentHistory(transaction, duty, duty.assignment);
+      return duty;
     });
 
     return res.status(201).json({
@@ -317,17 +323,31 @@ export async function updateDuty(req, res, next) {
       updateData.totalDurationHours = calculateShiftDurationHours(targetStart, targetEnd);
     }
 
-    if (notes !== undefined && duty.assignment) {
-      await prisma.dutyAssignment.update({
-        where: { dutyId: id },
-        data: { notes }
-      });
-    }
+    const updated = await prisma.$transaction(async (transaction) => {
+      if (notes !== undefined && duty.assignment) {
+        await transaction.dutyAssignment.update({
+          where: { dutyId: id },
+          data: { notes }
+        });
+      }
 
-    const updated = await prisma.duty.update({
-      where: { id },
-      data: updateData,
-      include: { assignment: true }
+      if (status === "Completed" && duty.status !== "Completed") {
+        await completeDuty(transaction, duty);
+        delete updateData.status;
+      } else {
+        if (status === "Active" || status === "Scheduled" || status === "Cancelled") {
+          await transaction.crewAssignment.updateMany({
+            where: { dutyId: id, status: { in: ["Scheduled", "Active"] } },
+            data: { status }
+          });
+        }
+      }
+
+      return transaction.duty.update({
+        where: { id },
+        data: updateData,
+        include: { assignment: true }
+      });
     });
 
     return res.status(200).json({
