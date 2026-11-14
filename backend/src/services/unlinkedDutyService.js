@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { prisma } from "../config/prisma.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACTIVE_ASSIGNMENT_STATUSES = ["Scheduled", "Active"];
@@ -92,7 +91,7 @@ export async function assertCrewAvailable(transaction, crewId, role, start, end,
   const crew = await transaction.crew.findUnique({ where: { id: crewId } });
   if (!crew) throw notFound(`Selected ${role.toLowerCase()} was not found.`);
   if (crew.role !== role) throw badRequest(`${crew.name} is a ${crew.role}, not a ${role}.`);
-  if (!["Available", "On Rest"].includes(crew.status)) {
+  if (!["Available", "On Rest", "On Duty"].includes(crew.status)) {
     throw conflict(`${role} ${crew.name} is ${crew.status.toLowerCase()} and cannot be assigned.`);
   }
 
@@ -202,6 +201,39 @@ export async function createDutyWithCrew(transaction, {
   return { duty, assignmentRows };
 }
 
+export async function createCrewAssignmentHistory(transaction, duty, assignment) {
+  const interval = makeDutyInterval(
+    duty.shiftDate,
+    duty.startTime.slice(0, 5),
+    duty.endTime.slice(0, 5)
+  );
+  if (interval.error) throw badRequest(interval.error);
+  return Promise.all([
+    transaction.crewAssignment.create({
+      data: {
+        crewId: assignment.driverId,
+        busId: assignment.busId,
+        dutyId: duty.id,
+        role: "Driver",
+        assignmentStartTime: interval.start,
+        assignmentEndTime: interval.end,
+        status: duty.status === "Active" ? "Active" : "Scheduled"
+      }
+    }),
+    transaction.crewAssignment.create({
+      data: {
+        crewId: assignment.conductorId,
+        busId: assignment.busId,
+        dutyId: duty.id,
+        role: "Conductor",
+        assignmentStartTime: interval.start,
+        assignmentEndTime: interval.end,
+        status: duty.status === "Active" ? "Active" : "Scheduled"
+      }
+    })
+  ]);
+}
+
 export async function recordRestPeriods(transaction, dutyId, completedAt) {
   const requiredRestDurationMinutes = getRequiredRestMinutes();
   const assignments = await transaction.crewAssignment.findMany({ where: { dutyId } });
@@ -271,8 +303,6 @@ export async function availabilityForCrew(transaction, crew, at = new Date()) {
     availability = "On Duty";
   } else if (latestRest && latestRest.restEndTime > at) {
     availability = "Resting";
-  } else if (activeAssignment) {
-    availability = "Not Available";
   }
 
   const requiredRestMinutes = latestRest?.requiredRestDurationMinutes ?? getRequiredRestMinutes();
