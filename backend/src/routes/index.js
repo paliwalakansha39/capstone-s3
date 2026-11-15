@@ -11,6 +11,7 @@ import routeRoutes from "./routeRoutes.js";
 import stopRoutes from "./stopRoutes.js";
 import unlinkedScheduleRoutes from "./unlinkedScheduleRoutes.js";
 import handoverRoutes from "./handoverRoutes.js";
+import analyticsRoutes from "./analyticsRoutes.js";
 
 const apiRouter = Router();
 
@@ -35,6 +36,7 @@ apiRouter.use("/schedules/unlinked", unlinkedScheduleRoutes);
 apiRouter.use("/handovers", handoverRoutes);
 apiRouter.use("/routes", routeRoutes);
 apiRouter.use("/stops", stopRoutes);
+apiRouter.use("/analytics", analyticsRoutes);
 apiRouter.get("/legacy-routes", getLegacyRoutes);
 apiRouter.get("/drivers", getAllDrivers);
 
