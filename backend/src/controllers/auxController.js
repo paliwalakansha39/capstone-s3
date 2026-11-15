@@ -14,12 +14,22 @@ export async function getLegacyRoutes(req, res, next) {
   }
 }
 
-// GET /api/drivers
+// GET /api/drivers - Safe public driver roster with PII protection
 export async function getAllDrivers(req, res, next) {
   try {
-    // Returns driver roster from unified crew model
+    // Return sanitized operational driver roster without PII (phone, commercial license)
     const drivers = await prisma.crew.findMany({
       where: { role: "Driver" },
+      select: {
+        id: true,
+        crewId: true,
+        name: true,
+        role: true,
+        badgeNumber: true,
+        assignedDepot: true,
+        status: true,
+        experienceYears: true
+      },
       orderBy: { name: "asc" }
     });
     return res.status(200).json({

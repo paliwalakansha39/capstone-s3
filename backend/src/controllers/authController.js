@@ -3,6 +3,9 @@ import jwt from "jsonwebtoken";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "../config/prisma.js";
 
+// Pre-computed constant bcrypt hash (12 salt rounds) used for constant-time comparison on unknown users
+const DUMMY_BCRYPT_HASH = "$2b$12$e8X8tWb27lYVbBqf.WJ0eeo5FkmqN0y8B9X6q5mCqXG0Kj8W9X6q5";
+
 const publicAdmin = ({ id, name, email, role, createdAt, updatedAt }) => ({
   id, name, email, role, createdAt, updatedAt
 });
@@ -61,8 +64,12 @@ export async function loginAdmin(req, res, next) {
       return res.status(400).json({ success: false, error: "Email and password are required." });
     }
     const admin = await prisma.admin.findUnique({ where: { email } });
-    const matches = admin ? await bcrypt.compare(password, admin.password) : false;
-    if (!matches) return res.status(401).json({ success: false, error: "Invalid email or password." });
+    const passwordHash = admin ? admin.password : DUMMY_BCRYPT_HASH;
+    const matches = await bcrypt.compare(password, passwordHash);
+
+    if (!admin || !matches) {
+      return res.status(401).json({ success: false, error: "Invalid email or password." });
+    }
     return res.status(200).json({
       success: true,
       data: { token: createToken(admin), admin: publicAdmin(admin) }

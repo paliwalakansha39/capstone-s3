@@ -1,5 +1,12 @@
 export function errorHandler(err, req, res, next) {
-  console.error("Backend Error:", err);
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!isProduction) {
+    console.error("Backend Error:", err);
+  } else {
+    // Production log: log error type and sanitized message without dumping credentials or payload secrets
+    console.error(`[Backend Error] ${err.name || "Error"}: ${err.message?.replace(/postgres:[^@]+@/g, "postgres:***@")}`);
+  }
 
   if (err.code === "P2002") {
     const target = Array.isArray(err.meta?.target) ? err.meta.target.join(", ") : "unique field";
@@ -42,7 +49,12 @@ export function errorHandler(err, req, res, next) {
 
   // Custom or status-defined errors
   const status = err.statusCode || err.status || 500;
-  const message = err.message || "An unexpected internal server error occurred.";
+  let message = err.message || "An unexpected internal server error occurred.";
+
+  // In production, mask 500 internal errors to prevent leaking database/server internals
+  if (status >= 500 && isProduction) {
+    message = "An unexpected internal server error occurred.";
+  }
 
   return res.status(status).json({
     success: false,

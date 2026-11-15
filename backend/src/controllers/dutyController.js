@@ -82,10 +82,10 @@ export async function getAllDuties(req, res, next) {
                 }
               },
               driver: {
-                select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true }
+                select: { id: true, name: true, crewId: true, badgeNumber: true, status: true }
               },
               conductor: {
-                select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true }
+                select: { id: true, name: true, crewId: true, badgeNumber: true, status: true }
               }
             }
           }
@@ -182,10 +182,10 @@ export async function getDutyById(req, res, next) {
               }
             },
             driver: {
-              select: { id: true, name: true, crewId: true, badgeNumber: true, licenseNumber: true, phone: true, status: true }
+              select: { id: true, name: true, crewId: true, badgeNumber: true, status: true }
             },
             conductor: {
-              select: { id: true, name: true, crewId: true, badgeNumber: true, phone: true, status: true }
+              select: { id: true, name: true, crewId: true, badgeNumber: true, status: true }
             }
           }
         }

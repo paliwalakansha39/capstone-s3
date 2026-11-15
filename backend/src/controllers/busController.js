@@ -60,7 +60,7 @@ export async function getAllBuses(req, res, next) {
             select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true }
           },
           driver: {
-            select: { id: true, name: true, badgeNumber: true, phone: true }
+            select: { id: true, name: true, badgeNumber: true, status: true }
           }
         },
         orderBy: { [sortField]: orderDirection },
@@ -128,7 +128,7 @@ export async function getBusById(req, res, next) {
           select: { id: true, routeNumber: true, routeName: true, startingPoint: true, destination: true, totalDistance: true }
         },
         driver: {
-          select: { id: true, name: true, badgeNumber: true, phone: true, licenseNumber: true, status: true }
+          select: { id: true, name: true, badgeNumber: true, status: true }
         }
       }
     });
@@ -205,7 +205,9 @@ export async function createBus(req, res, next) {
       },
       include: {
         route: true,
-        driver: true
+        driver: {
+          select: { id: true, name: true, badgeNumber: true, status: true }
+        }
       }
     });
 
@@ -294,7 +296,9 @@ export async function updateBus(req, res, next) {
       data: updateData,
       include: {
         route: true,
-        driver: true
+        driver: {
+          select: { id: true, name: true, badgeNumber: true, status: true }
+        }
       }
     });
 

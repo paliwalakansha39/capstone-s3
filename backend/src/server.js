@@ -9,7 +9,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
+const HOST = process.env.HOST || "0.0.0.0";
 const PORT = process.env.PORT || 5001;
+
+let activeServer = null;
+
+async function handleShutdown(signal) {
+  console.log(`Received ${signal}. Gracefully terminating DTC server...`);
+  if (activeServer) {
+    activeServer.close(async () => {
+      console.log("HTTP server closed.");
+      try {
+        await prisma.$disconnect();
+        console.log("Prisma client disconnected.");
+      } catch (err) {
+        console.error("Error during Prisma disconnect:", err);
+      }
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+process.on("SIGINT", () => handleShutdown("SIGINT"));
 
 async function startServer() {
   try {
@@ -18,13 +42,13 @@ async function startServer() {
     console.log("PostgreSQL connected successfully.");
 
     const app = createApp();
-    const server = app.listen(PORT, () => {
-      console.log(`DTC Bus Management API running at http://localhost:${PORT}`);
-      console.log(`API health endpoint: http://localhost:${PORT}/api/health`);
-      console.log(`Bus endpoints: http://localhost:${PORT}/api/buses`);
+    activeServer = app.listen(PORT, HOST, () => {
+      console.log(`DTC Bus Management API running at http://${HOST}:${PORT}`);
+      console.log(`API health endpoint: http://${HOST}:${PORT}/api/health`);
+      console.log(`Bus endpoints: http://${HOST}:${PORT}/api/buses`);
     });
 
-    return server;
+    return activeServer;
   } catch (error) {
     console.error("Failed to start DTC backend server:", error);
     process.exit(1);

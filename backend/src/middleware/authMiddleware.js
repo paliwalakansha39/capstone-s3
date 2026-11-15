@@ -9,7 +9,9 @@ export function requireAdminAuth(req, res, next) {
 
   try {
     const secret = process.env.JWT_SECRET;
-    if (!secret) throw new Error("JWT_SECRET is not configured.");
+    if (!secret || secret.length < 32) {
+      throw new Error("JWT_SECRET must be configured with at least 32 characters.");
+    }
     req.auth = jwt.verify(authorization.slice(7), secret);
     if (req.auth.role !== "admin") {
       return res.status(403).json({ success: false, error: "Administrator access required." });

@@ -27,11 +27,11 @@ router.get("/availability", getCrewAvailabilityStats);
 router.get("/available", requireAdminAuth, listAvailableCrew);
 router.get("/availability-calendar", requireAdminAuth, getCrewAvailabilityCalendar);
 
-// Crew listing and retrieval
-router.get("/", getAllCrew);
+// Crew listing and retrieval (admin-protected to guard crew PII & license records)
+router.get("/", requireAdminAuth, getAllCrew);
 router.get("/:id/availability", requireAdminAuth, getCrewAvailability);
 router.get("/:id/rest-periods", requireAdminAuth, getCrewRestPeriods);
-router.get("/:id", getCrewById);
+router.get("/:id", requireAdminAuth, getCrewById);
 
 // Admin-managed crew CRUD endpoints
 router.post("/", requireAdminAuth, validateCreateCrew, createCrew);
