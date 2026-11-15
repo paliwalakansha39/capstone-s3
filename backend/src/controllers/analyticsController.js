@@ -7,6 +7,7 @@ import { getCrewUtilizationAnalytics } from "../services/crewAnalyticsQuery.js";
 import { getTripOperationsAnalytics } from "../services/tripAnalyticsQuery.js";
 import { getRouteNetworkAnalytics } from "../services/routeAnalyticsQuery.js";
 import { runSystemValidation } from "../services/systemValidationService.js";
+import { generateOperationalReport } from "../services/reportExportService.js";
 
 /**
  * Controller for Operational Analytics and Reporting Endpoints.
@@ -103,3 +104,66 @@ export async function getSystemValidationHandler(req, res, next) {
     next(error);
   }
 }
+
+/**
+ * GET /api/analytics/export
+ * Generates and downloads an operational report in CSV or JSON format.
+ */
+export async function exportReportHandler(req, res, next) {
+  try {
+    const { type = "summary", format = "csv", depot, startDate, endDate } = req.query;
+    const report = await generateOperationalReport({
+      type,
+      format,
+      filters: { depot, startDate, endDate }
+    });
+
+    res.setHeader("Content-Type", report.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${report.filename}"`);
+    return res.status(200).send(report.content);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/analytics/reports/metadata
+ * Lists available report types, formats, and parameter options.
+ */
+export async function getReportTypesHandler(req, res, next) {
+  try {
+    const reportTypes = [
+      {
+        id: "summary",
+        title: "Executive Operational Summary",
+        description: "High-level summary of fleet, crew, trip delivery, and system health status."
+      },
+      {
+        id: "fleet",
+        title: "Bus Fleet Utilization Report",
+        description: "Complete vehicle roster with depot allocations, capacities, and assigned trip counts."
+      },
+      {
+        id: "crew",
+        title: "Crew Workload & Rest Compliance",
+        description: "Driver and conductor roster with badge numbers, duty hours, and rest periods."
+      },
+      {
+        id: "trips",
+        title: "Trip Operations & Route Performance",
+        description: "Scheduled trips, completion ratios, cancelled services, and passenger km."
+      }
+    ];
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        formats: ["csv", "json"],
+        reportTypes
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
