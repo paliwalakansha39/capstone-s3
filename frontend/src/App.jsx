@@ -14,6 +14,7 @@ import CrewManagementPage from "./pages/CrewManagementPage";
 import TripManagementPage from "./pages/TripManagementPage";
 import DutySchedulingPage from "./pages/DutySchedulingPage";
 import UnlinkedDutyPage from "./pages/UnlinkedDutyPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 const RouteManagementPage = lazy(() => import("./pages/RouteManagementPage"));
 const RouteOverlapPage = lazy(() => import("./pages/RouteOverlapPage"));
 
@@ -38,6 +39,8 @@ export default function App() {
       <Route path="duties" element={<DutySchedulingPage />} />
       {/* Chunk 7: Unlinked Duty Scheduling */}
       <Route path="unlinked-duties" element={<UnlinkedDutyPage />} />
+      {/* Chunk 9: Operational Analytics & Reports */}
+      <Route path="analytics" element={<AnalyticsPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;

@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BusFront,
   CalendarCheck,
   CalendarDays,
@@ -28,7 +29,8 @@ const links = [
   { to: "/admin/route-overlap", label: "Route Overlap", icon: Layers },
   { to: "/admin/trips", label: "Trip Management", icon: CalendarDays },
   { to: "/admin/duties", label: "Duty Scheduling", icon: CalendarCheck },
-  { to: "/admin/unlinked-duties", label: "Unlinked Duty & Rest", icon: ArrowRightLeft }
+  { to: "/admin/unlinked-duties", label: "Unlinked Duty & Rest", icon: ArrowRightLeft },
+  { to: "/admin/analytics", label: "Analytics & Reports", icon: BarChart3 }
 ];
 
 export default function AdminLayout({ admin, logout, context }) {

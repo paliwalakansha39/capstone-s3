@@ -12,7 +12,7 @@ import {
   Sparkles
 } from "lucide-react";
 import {
-  getFullSystemAnalytics,
+  getFullAnalytics,
   getSystemValidation,
   downloadReport
 } from "../services/analyticsService";
@@ -42,7 +42,7 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await getFullSystemAnalytics(filters);
+      const res = await getFullAnalytics(filters);
       setData(res);
     } catch (err) {
       console.error("Failed to load analytics:", err);

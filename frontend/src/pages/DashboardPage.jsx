@@ -70,6 +70,7 @@ export default function DashboardPage() {
           <Link className="activity-link" to="/admin/crew">Crew roster <ArrowUpRight size={15} /></Link>
           <Link className="activity-link" to="/admin/trips">Trips <ArrowUpRight size={15} /></Link>
           <Link className="activity-link" to="/admin/duties">Duty schedule <ArrowUpRight size={15} /></Link>
+          <Link className="activity-link" to="/admin/analytics">Analytics & Reports <ArrowUpRight size={15} /></Link>
         </div>
       </section>
     </div>
