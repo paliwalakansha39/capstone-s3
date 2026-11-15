@@ -8,7 +8,9 @@ A comprehensive public transit operations and fleet management platform for Delh
 - **Chunk 3 — Crew Management System (Member 3)**: Fullstack crew roster and duty availability platform featuring Crew database models, qualifications storage, availability validation middleware, RESTful APIs, and responsive admin UI with live availability KPI cards, role filtering (Drivers vs. Conductors), and modal inspector.
 - **Chunk 5 — Trip Management (Member 5)**: Fullstack bus trip scheduling and operations platform featuring Trip database models, Route and Bus associations, PostgreSQL migrations and indexes, time and bus conflict validation middleware, RESTful CRUD APIs with bus availability checking, and responsive admin UI with trip schedule table, statistics cards, route/date/status filters, trip creation and editing forms, and automated integration tests.
 - **Chunk 6 — Linked Duty Scheduling (Member 3)**: Automated and manual linked duty scheduling adhering to permanent 1:1 crew-bus binding (&le; 8.0 hr shifts, dedicated driver-conductor pairs without vehicle handover), collision-free scheduling engine, duty assignment matrix, and full lifecycle management.
-- **Chunk 7 — Unlinked Duty Scheduling & Rest Management**: Admin-protected crew availability and rest APIs, configurable rest enforcement, conflict-checked bus handovers, assignment/rest history, and a responsive schedule, handover, rest, and availability-calendar dashboard.
+- **Chunk 7 — Unlinked Duty Scheduling & Rest Management (Member 1)**: Admin-protected crew availability and rest APIs, configurable rest enforcement, conflict-checked bus handovers, assignment/rest history, and a responsive schedule, handover, rest, and availability-calendar dashboard.
+- **Chunk 8 — Route Overlap Detection & Visualization (Member 2)**: Interactive Leaflet map for plotting proposed route waypoints, corridor tolerance configuration, automated spatial overlap detection engine, overlap percentage calculation, and segment severity classification.
+- **Chunk 9 — Operational Analytics, Reports & Final Integration (Member 3)**: Unified system health score (0–100), fleet utilization charts, crew workload distribution, hourly trip dispatch density, route corridor overlap metrics, system-wide consistency validator, and multi-format CSV/JSON report exports.
 - **Route & Stop Management**: PostgreSQL-backed routes and ordered bus stops with interactive OpenStreetMap display.
 
 ## Technology Stack
@@ -80,10 +82,15 @@ The frontend runs at **`http://localhost:5173`** and automatically proxies `/api
 
 ### 3. Run Automated Tests
 
-To run the complete automated test suite (71+ tests across 6 test suites):
+To run the complete automated test suite (123+ backend tests across 11 test suites and 6 frontend regression tests):
 
 ```sh
+# Run backend test suites (Authentication, Buses, Crew, Trips, Duties, Unlinked, Route Overlap, Analytics, Integration)
 cd backend
+npm test
+
+# Run frontend tests
+cd ../frontend
 npm test
 ```
 
@@ -163,6 +170,35 @@ npm test
 ```
 
 The migration adds `crew_assignments`, `duty_handovers`, and `rest_periods` with foreign keys/indexes and backfills existing duty assignments. It does not delete existing operational records.
+
+## Route Overlap Detection & Visualization (Chunk 8)
+
+The Route Overlap page is available at `/admin/route-overlap`. Administrators can draw or plot proposed route waypoints directly on the interactive map, configure corridor tolerance (25m to 200m), execute automated spatial overlap detection against all existing DTC routes, and inspect color-coded overlapping segments.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/routes/analyze-overlap` | Execute spatial route overlap detection on proposed coordinates with configurable tolerance |
+| `GET` | `/api/routes/overlap-history` | List historical route overlap analysis runs |
+| `GET` | `/api/routes/overlap-analysis/:id` | Retrieve detailed analysis record with overlapping segment geometries |
+| `POST` | `/api/routes/proposed` | Save a proposed route draft to the database |
+| `GET` | `/api/routes/proposed` | List all proposed route drafts with status and coordinate sequences |
+
+## Operational Analytics, Reports & Final Integration (Chunk 9)
+
+The Analytics & Reports dashboard is available at `/admin/analytics`. It provides real-time operational telemetry, multi-domain KPI scorecards, visual utilization charts, cross-module relational consistency verification, and one-click export of structured reports in CSV or JSON formats.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/analytics/overview` | Composite system health score (0–100), factor breakdown, and high-level KPI cards |
+| `GET` | `/api/analytics/full` | Complete multidimensional operational metrics (Fleet, Crew, Trips, Network) |
+| `GET` | `/api/analytics/fleet` | Bus fleet utilization rate, propulsion type distribution, and depot allocation bars |
+| `GET` | `/api/analytics/crew` | Crew workload status (reserve vs deployed), rest compliance %, and active personnel ranking |
+| `GET` | `/api/analytics/trips` | Hourly dispatch frequency histogram (05:00–23:00) with peak rush hour indicators |
+| `GET` | `/api/analytics/network` | Route network corridor lengths, stop density, and overlap redundancy breakdown |
+| `GET` | `/api/analytics/validation` | Automated cross-module consistency diagnostic checking relational integrity |
+| `GET` | `/api/analytics/export` | Stream downloadable operational reports in `csv` or `json` format (`type=summary|fleet|crew|trips`) |
+| `GET` | `/api/analytics/reports/metadata` | Discover available report domains, descriptions, and supported file formats |
+
 
 ## Route and Bus Stop Management
 
