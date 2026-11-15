@@ -5,7 +5,7 @@ import { createApp } from "../src/app.js";
 import { initDatabaseConnection } from "../src/config/database.js";
 import { runMigrations } from "../src/scripts/migrate.js";
 import { seedDatabase } from "../src/scripts/seed.js";
-import { Bus, Crew, Duty } from "../src/models/index.js";
+import { Bus, Crew, Duty, Trip, prisma } from "../src/models/index.js";
 
 let server;
 let baseUrl;
@@ -54,9 +54,18 @@ describe("DTC Linked Duty Scheduling API Test Suite (Chunk 6)", () => {
     sampleConductor = await Crew.findFirst({ where: { role: "Conductor" } });
 
     // Clean up test duties if any
-    await Duty.deleteMany({
-      where: { dutyNumber: { contains: "TEST" } }
+    const testDuties = await Duty.findMany({
+      where: { dutyNumber: { contains: "TEST" } },
+      select: { id: true }
     });
+    const testIds = testDuties.map((d) => d.id);
+    if (testIds.length > 0) {
+      await prisma.restPeriod.deleteMany({ where: { previousDutyId: { in: testIds } } });
+      await prisma.dutyHandover.deleteMany({ where: { OR: [{ previousDutyId: { in: testIds } }, { newDutyId: { in: testIds } }] } });
+      await prisma.crewAssignment.deleteMany({ where: { dutyId: { in: testIds } } });
+      await prisma.dutyAssignment.deleteMany({ where: { dutyId: { in: testIds } } });
+      await Duty.deleteMany({ where: { id: { in: testIds } } });
+    }
   });
 
   // 1. GET /api/duties
@@ -243,12 +252,13 @@ describe("DTC Linked Duty Scheduling API Test Suite (Chunk 6)", () => {
 
   // 10. Automated Linked Duty Scheduling Engine
   it("POST /api/duties/generate-linked should run automated scheduling algorithm", async () => {
-    const today = new Date().toISOString().split("T")[0];
+    const existingTrip = await Trip.findFirst({ select: { tripDate: true } });
+    const targetDate = existingTrip ? existingTrip.tripDate : new Date().toISOString().split("T")[0];
 
     const res = await authorizedFetch(`${baseUrl}/duties/generate-linked`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shiftDate: today })
+      body: JSON.stringify({ shiftDate: targetDate })
     });
 
     assert.equal(res.status, 201);
@@ -284,6 +294,10 @@ describe("DTC Linked Duty Scheduling API Test Suite (Chunk 6)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Scheduled" })
     });
+
+    // Clear test operational history so clean delete succeeds
+    await prisma.restPeriod.deleteMany({ where: { previousDutyId: testDutyId } });
+    await prisma.crewAssignment.deleteMany({ where: { dutyId: testDutyId } });
 
     const res = await authorizedFetch(`${baseUrl}/duties/${testDutyId}`, {
       method: "DELETE"
