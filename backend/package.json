@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "prisma generate && prisma migrate deploy",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node src/scripts/migrate.js",

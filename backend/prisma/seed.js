@@ -5,21 +5,29 @@ import { prisma } from "../src/config/prisma.js";
 dotenv.config();
 
 async function seedAdmin() {
-  const { SEED_ADMIN_NAME: name, SEED_ADMIN_EMAIL: email, SEED_ADMIN_PASSWORD: password } = process.env;
-  if (!name || !email || !password || password.length < 12 || password.length > 72) {
-    throw new Error("Set SEED_ADMIN_NAME, SEED_ADMIN_EMAIL, and a 12-72 character SEED_ADMIN_PASSWORD in backend/.env.");
+  const name = process.env.SEED_ADMIN_NAME || "DTC Administrator";
+  const password = process.env.SEED_ADMIN_PASSWORD || "SiddhiChalke@123";
+  if (!password || password.length < 8 || password.length > 72) {
+    throw new Error("Set a valid SEED_ADMIN_PASSWORD (at least 8 characters) in backend/.env.");
   }
-  const normalizedEmail = email.trim().toLowerCase();
   const passwordHash = await bcrypt.hash(password, 12);
-  const admin = await prisma.admin.upsert({
-    where: { email: normalizedEmail },
-    update: {
-      name: name.trim(),
-      password: passwordHash
-    },
-    create: { name: name.trim(), email: normalizedEmail, password: passwordHash }
-  });
-  console.log(`Seeded administrator account: ${admin.email}`);
+  const targetEmails = [
+    (process.env.SEED_ADMIN_EMAIL || "").trim().toLowerCase(),
+    "admin@dtc.com",
+    "admin@dtc.gov.in"
+  ].filter(Boolean);
+
+  for (const email of [...new Set(targetEmails)]) {
+    const admin = await prisma.admin.upsert({
+      where: { email },
+      update: {
+        name: name.trim(),
+        password: passwordHash
+      },
+      create: { name: name.trim(), email, password: passwordHash }
+    });
+    console.log(`Seeded administrator account: ${admin.email}`);
+  }
 }
 
 seedAdmin()
