@@ -46,9 +46,9 @@ cp .env.example .env
 # Step 3: Create the PostgreSQL database (if not already created)
 createdb dtc_bus_management
 
-# Step 4: Generate Prisma Client & push schema to PostgreSQL
+# Step 4: Generate Prisma Client & apply the ordered migrations
 npm run db:generate
-npx prisma db push
+npm run db:migrate
 
 # Step 5: Seed initial operational data (Buses, Crews, Routes, Trips, Duties, Admins)
 npm run seed
@@ -59,6 +59,8 @@ npm start
 ```
 
 > **Note:** The backend operates on a **single, unified PostgreSQL database** using **Prisma ORM**, eliminating dual-database complexity and guaranteeing referential integrity across all operational entities.
+>
+> Set both `DATABASE_URL` and `DIRECT_URL` in `backend/.env`. They can use the same local connection string; hosted PostgreSQL providers may supply a pooled URL for `DATABASE_URL` and a direct connection URL for `DIRECT_URL`. If the target database already contains tables or data created outside Prisma migrations, inspect and back up that database before applying migrations; do not use `db push` or reset it to work around migration errors.
 
 ---
 
