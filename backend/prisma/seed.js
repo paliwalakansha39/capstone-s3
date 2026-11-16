@@ -13,7 +13,10 @@ async function seedAdmin() {
   const passwordHash = await bcrypt.hash(password, 12);
   const admin = await prisma.admin.upsert({
     where: { email: normalizedEmail },
-    update: {},
+    update: {
+      name: name.trim(),
+      password: passwordHash
+    },
     create: { name: name.trim(), email: normalizedEmail, password: passwordHash }
   });
   console.log(`Seeded administrator account: ${admin.email}`);
