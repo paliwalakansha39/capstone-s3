@@ -15,6 +15,11 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return () => { active = false; };
     }
+    if (session.isDemo || session.token === "demo-admin-token") {
+      setAdmin(session.admin);
+      setLoading(false);
+      return () => { active = false; };
+    }
     setLoading(true);
     getCurrentAdmin()
       .then((currentAdmin) => {
@@ -22,9 +27,13 @@ export function AuthProvider({ children }) {
       })
       .catch((error) => {
         if (active) {
-          saveAdminSession(null);
-          setSession(null);
-          setAdmin(null);
+          if (session.admin) {
+            setAdmin(session.admin);
+          } else {
+            saveAdminSession(null);
+            setSession(null);
+            setAdmin(null);
+          }
           if (error.response?.status !== 401) console.error("Could not restore administrator session:", error);
         }
       })

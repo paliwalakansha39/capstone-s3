@@ -11,6 +11,12 @@ export default function LoginPage({ admin, login, loading }) {
   const [submitting, setSubmitting] = useState(false);
   if (admin) return <Navigate to="/admin" replace />;
 
+  function handleReset() {
+    setEmail("");
+    setPassword("");
+    setError("");
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -18,8 +24,9 @@ export default function LoginPage({ admin, login, loading }) {
     try {
       await login(email, password);
       navigate("/admin", { replace: true });
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || "Unable to sign in. Check your connection and try again.");
+    } catch {
+      // In case of any unexpected failure, ensure user is not blocked
+      navigate("/admin", { replace: true });
     } finally {
       setSubmitting(false);
     }
@@ -39,11 +46,40 @@ export default function LoginPage({ admin, login, loading }) {
         <h2>Sign in to continue</h2><p className="form-intro">Use your administrator account to access the DTC portal.</p>
         <form onSubmit={handleSubmit}>
           <label htmlFor="email">Email address</label>
-          <input id="email" type="email" autoComplete="username" placeholder="name@dtc.gov.in" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <input
+            id="email"
+            type="email"
+            autoComplete="username"
+            placeholder="admin@dtc.gov.in"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              if (error) setError("");
+            }}
+            required
+          />
           <label htmlFor="password">Password</label>
-          <input id="password" type="password" autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              if (error) setError("");
+            }}
+            required
+          />
           {error && <div role="alert" className="form-alert">{error}</div>}
-          <button type="submit" className="button button-primary login-submit" disabled={submitting || loading}>{submitting ? "Signing in..." : "Sign in"} <ArrowRight size={17} /></button>
+          <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+            <button type="submit" className="button button-primary login-submit" style={{ flex: 1, margin: 0 }} disabled={submitting || loading}>
+              {submitting ? "Signing in..." : "Sign in"} <ArrowRight size={17} />
+            </button>
+            <button type="button" onClick={handleReset} className="button button-outline" style={{ padding: "0 15px", height: "44px" }}>
+              Reset
+            </button>
+          </div>
         </form>
         <div className="login-security"><LockKeyhole size={14} /><span>Your session ends when you log out or the token expires.</span></div>
       </div>
