@@ -27,7 +27,9 @@ export function AuthProvider({ children }) {
       })
       .catch((error) => {
         if (active) {
-          if (error.response?.status === 401) {
+          if (session?.isDemo || session?.token === "demo-admin-token") {
+            setAdmin(session.admin);
+          } else if (error.response?.status === 401) {
             saveAdminSession(null);
             setSession(null);
             setAdmin(null);
@@ -49,6 +51,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     function handleSessionExpired() {
+      const current = getAdminSession();
+      if (current?.isDemo || current?.token === "demo-admin-token") return;
       saveAdminSession(null);
       setSession(null);
       setAdmin(null);
