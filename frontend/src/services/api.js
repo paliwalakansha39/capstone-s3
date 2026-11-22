@@ -18,6 +18,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      const errMsg = error.response?.data?.error || "";
+      if (errMsg.includes("Invalid or expired") || errMsg.includes("Authentication required") || errMsg.includes("no longer exists")) {
+        localStorage.removeItem("dtc-admin-session");
+        window.dispatchEvent(new Event("dtc-session-expired"));
+      }
+    }
     if (error.response?.data?.error) error.message = error.response.data.error;
     return Promise.reject(error);
   }

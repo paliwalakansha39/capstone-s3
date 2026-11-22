@@ -27,7 +27,11 @@ export function AuthProvider({ children }) {
       })
       .catch((error) => {
         if (active) {
-          if (session.admin) {
+          if (error.response?.status === 401) {
+            saveAdminSession(null);
+            setSession(null);
+            setAdmin(null);
+          } else if (session.admin) {
             setAdmin(session.admin);
           } else {
             saveAdminSession(null);
@@ -42,6 +46,16 @@ export function AuthProvider({ children }) {
       });
     return () => { active = false; };
   }, [session?.token]);
+
+  useEffect(() => {
+    function handleSessionExpired() {
+      saveAdminSession(null);
+      setSession(null);
+      setAdmin(null);
+    }
+    window.addEventListener("dtc-session-expired", handleSessionExpired);
+    return () => window.removeEventListener("dtc-session-expired", handleSessionExpired);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const authenticatedSession = await loginAdmin(email, password);
