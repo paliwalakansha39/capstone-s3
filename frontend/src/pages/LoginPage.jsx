@@ -45,6 +45,18 @@ export default function LoginPage({ admin, login, loading }) {
         <span className="eyebrow">ADMINISTRATOR SIGN IN</span>
         <h2>Sign in to continue</h2><p className="form-intro">Use your administrator account to access the DTC portal.</p>
         <form onSubmit={handleSubmit}>
+          <div style={{ background: "rgba(231, 119, 59, 0.08)", border: "1px dashed rgba(231, 119, 59, 0.4)", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px", lineHeight: "1.5" }}>
+            <span style={{ fontWeight: 600, color: "#111827" }}>Default Credentials:</span><br />
+            Email: <code style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setEmail("admin@dtc.gov.in")}>admin@dtc.gov.in</code><br />
+            Password: <code style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setPassword("main@123")}>main@123</code>
+            <button
+              type="button"
+              onClick={() => { setEmail("admin@dtc.gov.in"); setPassword("main@123"); setError(""); }}
+              style={{ display: "block", marginTop: "6px", fontSize: "12px", color: "#e7773b", background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600 }}
+            >
+              ⚡ Click here to auto-fill credentials
+            </button>
+          </div>
           <label htmlFor="email">Email address</label>
           <input
             id="email"
